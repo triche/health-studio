@@ -6,6 +6,7 @@ const BASE_HEADERS: Record<string, string> = {
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(url, {
     ...options,
+    credentials: "same-origin",
     headers: {
       ...BASE_HEADERS,
       ...options.headers,

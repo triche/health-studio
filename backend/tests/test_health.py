@@ -41,6 +41,8 @@ def test_body_too_large_returns_413(client):
 
 def test_error_no_stacktrace_when_debug_off():
     """When DEBUG=false, a 500 error should not contain a traceback."""
+    from unittest.mock import MagicMock, patch
+
     from starlette.testclient import TestClient
 
     from app.main import app
@@ -49,8 +51,43 @@ def test_error_no_stacktrace_when_debug_off():
     async def _raise_error():
         raise RuntimeError("boom")
 
-    with TestClient(app, raise_server_exceptions=False) as c:
-        response = c.get("/api/_test_error")
+    c = TestClient(app, raise_server_exceptions=False)
+    # Register + login to get past auth middleware
+    c.post("/api/auth/register", json={"display_name": "Test User"})
+    mock_reg = MagicMock()
+    mock_reg.credential_id = b"\x01\x02\x03\x04"
+    mock_reg.credential_public_key = b"\x05\x06\x07\x08"
+    mock_reg.sign_count = 0
+    with patch("app.services.auth.verify_registration_response", return_value=mock_reg):
+        c.post(
+            "/api/auth/register/complete",
+            json={
+                "id": "AQIDBA",
+                "rawId": "AQIDBA",
+                "response": {"attestationObject": "fake", "clientDataJSON": "fake"},
+                "type": "public-key",
+            },
+        )
+    c.post("/api/auth/login")
+    mock_auth = MagicMock()
+    mock_auth.new_sign_count = 1
+    mock_auth.credential_id = b"\x01\x02\x03\x04"
+    with patch("app.services.auth.verify_authentication_response", return_value=mock_auth):
+        c.post(
+            "/api/auth/login/complete",
+            json={
+                "id": "AQIDBA",
+                "rawId": "AQIDBA",
+                "response": {
+                    "authenticatorData": "fake",
+                    "clientDataJSON": "fake",
+                    "signature": "fake",
+                },
+                "type": "public-key",
+            },
+        )
+
+    response = c.get("/api/_test_error")
     assert response.status_code == 500
     body = response.json()
     assert "traceback" not in body
