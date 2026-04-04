@@ -82,6 +82,7 @@ def get_summary(db: Session) -> dict:
                 "exercise_name": et.name if et else "Unknown",
                 "value": pr.value,
                 "display_value": pr.display_value,
+                "result_unit": et.result_unit if et else None,
                 "recorded_date": pr.recorded_date.isoformat(),
                 "is_rx": pr.is_rx,
             }
