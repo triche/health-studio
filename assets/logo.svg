@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#14B8A6"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect x="16" y="16" width="480" height="480" rx="96" ry="96" fill="url(#bg)"/>
+
+  <!-- Barbell — centered hero element -->
+  <g fill="#F1F5F9">
+    <!-- Bar -->
+    <rect x="96" y="237" width="320" height="38" rx="8"/>
+
+    <!-- Left outer plate -->
+    <rect x="68" y="162" width="44" height="188" rx="12" opacity="0.8"/>
+    <!-- Left inner plate -->
+    <rect x="120" y="182" width="36" height="148" rx="10"/>
+
+    <!-- Right inner plate -->
+    <rect x="356" y="182" width="36" height="148" rx="10"/>
+    <!-- Right outer plate -->
+    <rect x="400" y="162" width="44" height="188" rx="12" opacity="0.8"/>
+  </g>
+</svg>
