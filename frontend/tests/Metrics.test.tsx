@@ -155,7 +155,7 @@ describe("Metrics", () => {
     expect(screen.queryByTestId("plotly-chart")).not.toBeInTheDocument();
 
     // Click the show graph toggle
-    await user.click(screen.getByLabelText("Show graph"));
+    await user.click(await screen.findByLabelText("Show graph"));
 
     await waitFor(() => {
       expect(screen.getByTestId("plotly-chart")).toBeInTheDocument();
