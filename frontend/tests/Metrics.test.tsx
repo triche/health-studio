@@ -190,9 +190,9 @@ describe("Metrics", () => {
       </MemoryRouter>,
     );
 
-    // Show the graph first
+    // Show the graph first — use findByLabelText to wait for trend data to load
     await screen.findByText("Weight (lbs)");
-    await user.click(screen.getByLabelText("Show graph"));
+    await user.click(await screen.findByLabelText("Show graph"));
 
     await waitFor(() => {
       expect(screen.getByTestId("plotly-chart")).toBeInTheDocument();
