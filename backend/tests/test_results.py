@@ -326,6 +326,36 @@ class TestRXPRDetection:
 
 
 # ============================================================================
+# Reps-based PR Detection
+# ============================================================================
+
+
+class TestRepsPRDetection:
+    def test_higher_reps_is_pr(self, client: TestClient):
+        et = _create_exercise_type(
+            client, name="Strict Pull-Up", category="custom", result_unit="reps"
+        )
+        _create_result(client, et["id"], value=10, recorded_date="2025-06-01")
+        data = _create_result(client, et["id"], value=15, recorded_date="2025-06-08")
+        assert data["is_pr"] is True
+
+    def test_lower_reps_is_not_pr(self, client: TestClient):
+        et = _create_exercise_type(
+            client, name="Strict Pull-Up", category="custom", result_unit="reps"
+        )
+        _create_result(client, et["id"], value=15, recorded_date="2025-06-01")
+        data = _create_result(client, et["id"], value=10, recorded_date="2025-06-08")
+        assert data["is_pr"] is False
+
+    def test_first_reps_entry_is_pr(self, client: TestClient):
+        et = _create_exercise_type(
+            client, name="Strict Pull-Up", category="custom", result_unit="reps"
+        )
+        data = _create_result(client, et["id"], value=8, recorded_date="2025-06-01")
+        assert data["is_pr"] is True
+
+
+# ============================================================================
 # PR History Endpoint
 # ============================================================================
 

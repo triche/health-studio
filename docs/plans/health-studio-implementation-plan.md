@@ -484,14 +484,36 @@ Each phase is scoped to be implementable in a single LLM session and results in 
 **Goal**: Goal creation with Markdown plans, progress tracking, and a summary dashboard.
 
 **Deliverables**:
-- Backend: CRUD for goals; progress computation (current vs. target); dashboard summary endpoint
-- Frontend: Goals page — create/edit with Markdown plan editor, progress bar, status management
-- Frontend: Dashboard page — recent journal entries, active goals with progress, latest metrics, recent PRs
-- Visual progress indicators (progress bars, completion badges)
+
+#### Backend
+- CRUD for goals (`/api/goals`): create, read, list (with status filter + pagination), update, delete
+- Goal model fields: `title`, `description`, `plan` (Markdown), `target_type` (metric or result), `target_id`, `target_value`, `start_value` (optional), `current_value` (computed), `lower_is_better` (boolean, default false), `status` (active/completed/abandoned), `deadline` (optional date)
+- Dynamic progress computation in service layer:
+  - `current_value` auto-computed from latest metric entry or best PR for the linked target
+  - When `start_value` is set, progress = percentage of distance from start→target covered: `(current - start) / (target - start) * 100` for higher-is-better, `(start - current) / (start - target) * 100` for lower-is-better (clamped 0–100)
+  - When `start_value` is null, legacy formula: `current / target * 100` for higher-is-better, `target / current * 100` for lower-is-better
+- Dashboard summary endpoint (`/api/dashboard/summary`): recent journals (last 5), active goals with progress, latest metric per type, recent PRs (last 5)
+- Alembic migrations for `lower_is_better` and `start_value` columns on the `goals` table
+
+#### Frontend
+- Goals page — create/edit form with Markdown plan editor, progress bar, status management (active/completed/abandoned filter)
+- Goal form fields: title, description, plan (Markdown textarea), target type selector (metric/exercise result), target selector (populated from metric types or exercise types), target value, starting value (optional), deadline, "Lower is better" checkbox with helper text
+- Goal display: progress bar (primary color for active, accent for completed), direction indicator (`↓ Lower is better` / `↑ Higher is better`), start value shown when set, deadline display
+- Collapsible plan disclosure ("▶ Plan" toggle) with `react-markdown` + `remark-gfm` rendering (tables, strikethrough, GFM support) using `@tailwindcss/typography` prose styling
+- Dashboard page — 4 summary cards: Recent Journal Entries (links), Active Goals (progress bars), Latest Metrics (with duration formatting for minutes≥60), Recent PRs (badges)
+- Default route changed from `/journals` to `/dashboard`; Sidebar updated with Dashboard and Goals navigation links
+
+#### Additional Enhancements (implemented during Phase 6)
+- Added `reps` as an exercise result unit type (Results page dropdown); existing higher-is-better PR logic covers reps naturally
+- Installed `remark-gfm` for GFM Markdown support (tables, strikethrough) in Goals plans and Journal edit preview
+- Installed `@tailwindcss/typography` plugin with custom dark-mode prose theme (slate text, blue links, dark code blocks, styled table borders, muted strikethrough)
+- Duration formatting helper on Dashboard for metrics with `unit="minutes"` and value≥60 → "Xh Ym" display
 
 **Tests** (TDD):
-- Backend: Goal progress computes correctly; dashboard summary aggregates data from all domains
-- Frontend: Dashboard renders summary cards; goal progress bar reflects correct percentage
+- Backend: Goal CRUD (12 tests), goal progress computation (3 tests), lower-is-better flag (7 tests), start_value progress (10 tests), dashboard summary aggregation (5 tests) — 37 goal-specific tests
+- Backend: Reps PR detection (3 tests)
+- Frontend: Goals page — renders list, empty state, progress bar, create goal, complete, delete, filter by status, direction indicators, lower-is-better checkbox, start value display/creation (12 tests)
+- Frontend: Dashboard — summary cards, goal progress bar, empty state, PR badges (4 tests)
 
 ---
 

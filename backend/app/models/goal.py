@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime
 
-from sqlalchemy import Date, DateTime, Float, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -23,7 +23,9 @@ class Goal(Base):
     target_type: Mapped[str] = mapped_column(Text, nullable=False)
     target_id: Mapped[str] = mapped_column(Text, nullable=False)
     target_value: Mapped[float] = mapped_column(Float, nullable=False)
+    start_value: Mapped[float | None] = mapped_column(Float, nullable=True, default=None)
     current_value: Mapped[float] = mapped_column(Float, default=0.0)
+    lower_is_better: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     status: Mapped[str] = mapped_column(Text, nullable=False, default="active")
     deadline: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)

@@ -17,14 +17,23 @@ vi.mock("../src/api/metrics", () => ({
   getMetricTrend: vi.fn().mockResolvedValue({ data: [] }),
 }));
 
+vi.mock("../src/api/dashboard", () => ({
+  getDashboardSummary: vi.fn().mockResolvedValue({
+    recent_journals: [],
+    active_goals: [],
+    latest_metrics: [],
+    recent_prs: [],
+  }),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("App", () => {
-  it("renders the journal page by default", async () => {
+  it("renders the dashboard page by default", async () => {
     render(<App />);
-    expect(await screen.findByRole("heading", { name: "Journal" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
   });
 
   it("renders nav links for Journals and Metrics", async () => {

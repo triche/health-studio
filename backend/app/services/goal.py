@@ -1,0 +1,162 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from fastapi import HTTPException, status
+
+from app.models.goal import Goal
+from app.models.metric import MetricEntry
+from app.models.result import ResultEntry
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from app.schemas.goal import GoalCreate, GoalUpdate
+
+
+# ---------------------------------------------------------------------------
+# Progress computation
+# ---------------------------------------------------------------------------
+
+
+def _compute_current_value(db: Session, goal: Goal) -> float:
+    """Compute the current value for a goal based on its target type."""
+    if goal.target_type == "metric":
+        latest = (
+            db.query(MetricEntry)
+            .filter(MetricEntry.metric_type_id == goal.target_id)
+            .order_by(MetricEntry.recorded_date.desc(), MetricEntry.created_at.desc())
+            .first()
+        )
+        return latest.value if latest else 0.0
+
+    if goal.target_type == "result":
+        best = (
+            db.query(ResultEntry)
+            .filter(
+                ResultEntry.exercise_type_id == goal.target_id,
+                ResultEntry.is_pr.is_(True),
+            )
+            .order_by(ResultEntry.created_at.desc())
+            .first()
+        )
+        return best.value if best else 0.0
+
+    return goal.current_value
+
+
+def _compute_progress(
+    current_value: float,
+    target_value: float,
+    *,
+    lower_is_better: bool = False,
+    start_value: float | None = None,
+) -> float:
+    """Compute progress as a percentage (0-100), clamped.
+
+    When start_value is provided, progress is measured as the proportion of
+    the distance from start to target that has been covered.
+    """
+    if start_value is not None:
+        span = start_value - target_value if lower_is_better else target_value - start_value
+        if span == 0:
+            return 100.0
+        covered = start_value - current_value if lower_is_better else current_value - start_value
+        pct = (covered / span) * 100.0
+        return max(0.0, min(100.0, pct))
+
+    # Legacy behaviour when no start_value is set
+    if lower_is_better:
+        if current_value <= target_value:
+            return 100.0
+        if target_value == 0:
+            return 0.0
+        pct = (target_value / current_value) * 100.0
+        return max(0.0, min(100.0, pct))
+
+    if target_value == 0:
+        return 100.0 if current_value > 0 else 0.0
+    pct = (current_value / target_value) * 100.0
+    return max(0.0, min(100.0, pct))
+
+
+def _enrich_goal(db: Session, goal: Goal) -> Goal:
+    """Update goal's current_value dynamically and add progress attribute."""
+    goal.current_value = _compute_current_value(db, goal)
+    goal.progress = _compute_progress(  # type: ignore[attr-defined]
+        goal.current_value,
+        goal.target_value,
+        lower_is_better=goal.lower_is_better,
+        start_value=goal.start_value,
+    )
+    return goal
+
+
+# ---------------------------------------------------------------------------
+# CRUD
+# ---------------------------------------------------------------------------
+
+
+def create_goal(db: Session, data: GoalCreate) -> Goal:
+    goal = Goal(
+        title=data.title,
+        description=data.description,
+        plan=data.plan,
+        target_type=data.target_type,
+        target_id=data.target_id,
+        target_value=data.target_value,
+        start_value=data.start_value,
+        lower_is_better=data.lower_is_better,
+        status=data.status,
+        deadline=data.deadline,
+    )
+    db.add(goal)
+    db.commit()
+    db.refresh(goal)
+    return _enrich_goal(db, goal)
+
+
+def get_goal(db: Session, goal_id: str) -> Goal:
+    goal = db.get(Goal, goal_id)
+    if goal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
+    return _enrich_goal(db, goal)
+
+
+def list_goals(
+    db: Session,
+    *,
+    page: int = 1,
+    per_page: int = 20,
+    goal_status: str | None = None,
+) -> tuple[list[Goal], int]:
+    query = db.query(Goal)
+
+    if goal_status is not None:
+        query = query.filter(Goal.status == goal_status)
+
+    total = query.count()
+    items = (
+        query.order_by(Goal.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    )
+    return [_enrich_goal(db, g) for g in items], total
+
+
+def update_goal(db: Session, goal_id: str, data: GoalUpdate) -> Goal:
+    goal = db.get(Goal, goal_id)
+    if goal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(goal, key, value)
+    db.commit()
+    db.refresh(goal)
+    return _enrich_goal(db, goal)
+
+
+def delete_goal(db: Session, goal_id: str) -> None:
+    goal = db.get(Goal, goal_id)
+    if goal is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
+    db.delete(goal)
+    db.commit()
