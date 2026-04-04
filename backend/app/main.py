@@ -7,8 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import ALLOWED_ORIGINS, DEBUG, MAX_BODY_SIZE
+from app.routers import journals
 
 app = FastAPI(title="Health Studio", version="0.1.0")
+app.include_router(journals.router)
 
 # ---------------------------------------------------------------------------
 # CORS
