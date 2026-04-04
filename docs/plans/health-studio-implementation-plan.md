@@ -460,6 +460,25 @@ Each phase is scoped to be implementable in a single LLM session and results in 
 
 ---
 
+### Phase 5.5 — Type Selector UX Cleanup (Frontend)
+
+**Goal**: Replace the tag button list for type selection on Results and Metrics pages with a compact dropdown + manage panel.
+
+**Deliverables**:
+- Results page: exercise type selector is now a `<select>` dropdown with `<optgroup>` categories (Olympic Lift, Power Lift, CrossFit Benchmark, Running, Custom)
+- Metrics page: metric type selector is now a `<select>` dropdown
+- Both pages: "Manage" toggle button replaces the old inline `+ Add Type` button and per-type `×` delete buttons
+- Manage panel (shown on toggle) contains existing types as compact chips with delete buttons, plus the create form
+- Default view is clean: dropdown + Manage button on one line; no tag clutter
+
+**Tests** (TDD):
+- Dropdown renders as `<select>` with correct default value
+- Switching type via dropdown triggers data reload
+- Manage panel shows/hides on toggle with delete buttons and create form
+- Toggle closes manage panel on second click
+
+---
+
 ### Phase 6 — Goals & Dashboard (Backend + Frontend)
 
 **Goal**: Goal creation with Markdown plans, progress tracking, and a summary dashboard.

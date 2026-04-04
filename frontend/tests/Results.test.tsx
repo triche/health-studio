@@ -729,4 +729,152 @@ describe("Results", () => {
     expect(screen.getByText("225")).toBeInTheDocument();
     expect(mockUpdateResultEntry).not.toHaveBeenCalled();
   });
+
+  it("renders exercise types in a dropdown select", async () => {
+    mockListExerciseTypes.mockResolvedValue([
+      {
+        id: "1",
+        name: "Back Squat",
+        category: "power_lift",
+        result_unit: "lbs",
+        created_at: "2025-01-01T00:00:00",
+      },
+      {
+        id: "2",
+        name: "Fran",
+        category: "crossfit_benchmark",
+        result_unit: "seconds",
+        created_at: "2025-01-01T00:00:00",
+      },
+    ]);
+    mockListResultEntries.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 50 });
+    mockGetResultTrend.mockResolvedValue({
+      exercise_type_id: "1",
+      exercise_name: "Back Squat",
+      result_unit: "lbs",
+      data: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <Results />
+      </MemoryRouter>,
+    );
+
+    const select = await screen.findByLabelText("Exercise type");
+    expect(select.tagName).toBe("SELECT");
+    expect(select).toHaveValue("1");
+  });
+
+  it("switches exercise type via dropdown", async () => {
+    const user = userEvent.setup();
+    mockListExerciseTypes.mockResolvedValue([
+      {
+        id: "1",
+        name: "Back Squat",
+        category: "power_lift",
+        result_unit: "lbs",
+        created_at: "2025-01-01T00:00:00",
+      },
+      {
+        id: "2",
+        name: "Fran",
+        category: "crossfit_benchmark",
+        result_unit: "seconds",
+        created_at: "2025-01-01T00:00:00",
+      },
+    ]);
+    mockListResultEntries.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 50 });
+    mockGetResultTrend.mockResolvedValue({
+      exercise_type_id: "1",
+      exercise_name: "Back Squat",
+      result_unit: "lbs",
+      data: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <Results />
+      </MemoryRouter>,
+    );
+
+    const select = await screen.findByLabelText("Exercise type");
+    await user.selectOptions(select, "2");
+
+    await waitFor(() => {
+      expect(mockGetResultTrend).toHaveBeenCalledWith("2");
+    });
+  });
+
+  it("shows manage panel with type list and create form", async () => {
+    const user = userEvent.setup();
+    mockListExerciseTypes.mockResolvedValue([
+      {
+        id: "1",
+        name: "Back Squat",
+        category: "power_lift",
+        result_unit: "lbs",
+        created_at: "2025-01-01T00:00:00",
+      },
+    ]);
+    mockListResultEntries.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 50 });
+    mockGetResultTrend.mockResolvedValue({
+      exercise_type_id: "1",
+      exercise_name: "Back Squat",
+      result_unit: "lbs",
+      data: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <Results />
+      </MemoryRouter>,
+    );
+
+    await screen.findByLabelText("Exercise type");
+
+    // Manage panel hidden by default
+    expect(screen.queryByLabelText("Delete Back Squat")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Manage types" }));
+
+    // Should show delete button for existing type and create form
+    expect(screen.getByLabelText("Delete Back Squat")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Name (e.g. Back Squat)")).toBeInTheDocument();
+  });
+
+  it("toggles manage panel closed", async () => {
+    const user = userEvent.setup();
+    mockListExerciseTypes.mockResolvedValue([
+      {
+        id: "1",
+        name: "Back Squat",
+        category: "power_lift",
+        result_unit: "lbs",
+        created_at: "2025-01-01T00:00:00",
+      },
+    ]);
+    mockListResultEntries.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 50 });
+    mockGetResultTrend.mockResolvedValue({
+      exercise_type_id: "1",
+      exercise_name: "Back Squat",
+      result_unit: "lbs",
+      data: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <Results />
+      </MemoryRouter>,
+    );
+
+    await screen.findByLabelText("Exercise type");
+
+    const manageBtn = screen.getByRole("button", { name: "Manage types" });
+    await user.click(manageBtn);
+    expect(screen.getByLabelText("Delete Back Squat")).toBeInTheDocument();
+
+    await user.click(manageBtn);
+    expect(screen.queryByLabelText("Delete Back Squat")).not.toBeInTheDocument();
+  });
 });
