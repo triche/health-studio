@@ -52,6 +52,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockListMetricTypes.mockResolvedValue([
     { id: "mt-1", name: "Weight", unit: "lbs", created_at: "2025-01-01T00:00:00" },
+    { id: "mt-2", name: "Sleep", unit: "minutes", created_at: "2025-01-01T00:00:00" },
   ]);
   mockListExerciseTypes.mockResolvedValue([
     {
@@ -59,6 +60,13 @@ beforeEach(() => {
       name: "Back Squat",
       category: "power_lift",
       result_unit: "lbs",
+      created_at: "2025-01-01T00:00:00",
+    },
+    {
+      id: "et-2",
+      name: "Fran",
+      category: "crossfit_benchmark",
+      result_unit: "seconds",
       created_at: "2025-01-01T00:00:00",
     },
   ]);
@@ -343,5 +351,198 @@ describe("Goals", () => {
     await waitFor(() => {
       expect(mockCreateGoal).toHaveBeenCalledWith(expect.objectContaining({ start_value: 253 }));
     });
+  });
+
+  it("formats time values for exercise/seconds goals in display", async () => {
+    mockListGoals.mockResolvedValue({
+      items: [
+        {
+          ...GOAL_ITEM,
+          title: "Beat Fran",
+          target_type: "result",
+          target_id: "et-2",
+          target_value: 180,
+          current_value: 245,
+          start_value: 300,
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 20,
+    });
+
+    render(
+      <MemoryRouter>
+        <Goals />
+      </MemoryRouter>,
+    );
+
+    // target_value 180s = 3m 0s → shown in target info and progress bar
+    // current_value 245s = 4m 5s, start_value 300s = 5m 0s
+    expect(await screen.findByText(/4m 5s \/ 3m/)).toBeInTheDocument();
+    expect(screen.getByText(/start: 5m/i)).toBeInTheDocument();
+  });
+
+  it("formats duration values for metric/minutes goals in display", async () => {
+    mockListGoals.mockResolvedValue({
+      items: [
+        {
+          ...GOAL_ITEM,
+          title: "Sleep More",
+          target_type: "metric",
+          target_id: "mt-2",
+          target_value: 480,
+          current_value: 420,
+          start_value: 360,
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 20,
+    });
+
+    render(
+      <MemoryRouter>
+        <Goals />
+      </MemoryRouter>,
+    );
+
+    // current/target in progress bar: 7h 0m / 8h 0m
+    expect(await screen.findByText(/7h 0m \/ 8h 0m/)).toBeInTheDocument();
+    expect(screen.getByText(/start: 6h 0m/i)).toBeInTheDocument();
+  });
+
+  it("shows h/m/s inputs for target value when exercise type uses seconds", async () => {
+    const user = userEvent.setup();
+    mockListGoals.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 20 });
+
+    render(
+      <MemoryRouter>
+        <Goals />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/no goals/i);
+    await user.click(screen.getByRole("button", { name: /new goal/i }));
+    await user.selectOptions(screen.getByLabelText(/target type/i), "result");
+    await user.selectOptions(screen.getByLabelText(/^target$/i), "et-2");
+
+    expect(screen.getByLabelText(/target hours/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/target minutes/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/target seconds/i)).toBeInTheDocument();
+  });
+
+  it("shows h/m inputs for target value when metric type uses minutes", async () => {
+    const user = userEvent.setup();
+    mockListGoals.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 20 });
+
+    render(
+      <MemoryRouter>
+        <Goals />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/no goals/i);
+    await user.click(screen.getByRole("button", { name: /new goal/i }));
+    // target type defaults to "metric"
+    await user.selectOptions(screen.getByLabelText(/^target$/i), "mt-2");
+
+    expect(screen.getByLabelText(/target hours/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/target minutes/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/target seconds/i)).not.toBeInTheDocument();
+  });
+
+  it("submits time goal with converted seconds value", async () => {
+    const user = userEvent.setup();
+    mockListGoals.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 20 });
+    mockCreateGoal.mockResolvedValue({ ...GOAL_ITEM, id: "g-new" });
+
+    render(
+      <MemoryRouter>
+        <Goals />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/no goals/i);
+    await user.click(screen.getByRole("button", { name: /new goal/i }));
+    await user.type(screen.getByLabelText(/title/i), "Beat Fran");
+    await user.selectOptions(screen.getByLabelText(/target type/i), "result");
+    await user.selectOptions(screen.getByLabelText(/^target$/i), "et-2");
+    await user.type(screen.getByLabelText(/target hours/i), "0");
+    await user.type(screen.getByLabelText(/target minutes/i), "3");
+    await user.type(screen.getByLabelText(/target seconds/i), "30");
+
+    mockListGoals.mockResolvedValue({ items: [GOAL_ITEM], total: 1, page: 1, per_page: 20 });
+    await user.click(screen.getByRole("button", { name: /save goal/i }));
+
+    await waitFor(() => {
+      // 0*3600 + 3*60 + 30 = 210 seconds
+      expect(mockCreateGoal).toHaveBeenCalledWith(expect.objectContaining({ target_value: 210 }));
+    });
+  });
+
+  it("submits duration goal with converted minutes value", async () => {
+    const user = userEvent.setup();
+    mockListGoals.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 20 });
+    mockCreateGoal.mockResolvedValue({ ...GOAL_ITEM, id: "g-new" });
+
+    render(
+      <MemoryRouter>
+        <Goals />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText(/no goals/i);
+    await user.click(screen.getByRole("button", { name: /new goal/i }));
+    await user.type(screen.getByLabelText(/title/i), "Sleep More");
+    await user.selectOptions(screen.getByLabelText(/^target$/i), "mt-2");
+    await user.type(screen.getByLabelText(/target hours/i), "8");
+    await user.type(screen.getByLabelText(/target minutes/i), "0");
+
+    mockListGoals.mockResolvedValue({ items: [GOAL_ITEM], total: 1, page: 1, per_page: 20 });
+    await user.click(screen.getByRole("button", { name: /save goal/i }));
+
+    await waitFor(() => {
+      // 8*60 + 0 = 480 minutes
+      expect(mockCreateGoal).toHaveBeenCalledWith(expect.objectContaining({ target_value: 480 }));
+    });
+  });
+
+  it("populates time fields when editing a time-based goal", async () => {
+    const user = userEvent.setup();
+    const timeGoal = {
+      ...GOAL_ITEM,
+      title: "Beat Fran",
+      target_type: "result",
+      target_id: "et-2",
+      target_value: 210,
+      start_value: 300,
+      current_value: 245,
+    };
+    mockListGoals.mockResolvedValue({
+      items: [timeGoal],
+      total: 1,
+      page: 1,
+      per_page: 20,
+    });
+
+    render(
+      <MemoryRouter>
+        <Goals />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("Beat Fran");
+    await user.click(screen.getByRole("button", { name: /edit/i }));
+
+    // 210 seconds = 0h, 3m, 30s
+    expect(screen.getByLabelText(/target hours/i)).toHaveValue(0);
+    expect(screen.getByLabelText(/target minutes/i)).toHaveValue(3);
+    expect(screen.getByLabelText(/target seconds/i)).toHaveValue(30);
+
+    // 300 seconds = 0h, 5m, 0s
+    expect(screen.getByLabelText(/start hours/i)).toHaveValue(0);
+    expect(screen.getByLabelText(/start minutes/i)).toHaveValue(5);
+    expect(screen.getByLabelText(/start seconds/i)).toHaveValue(0);
   });
 });
