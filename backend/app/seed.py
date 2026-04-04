@@ -15,7 +15,7 @@ DEFAULT_METRIC_TYPES: list[tuple[str, str]] = [
     ("Weight", "lbs"),
     ("Waist Circumference", "inches"),
     ("Steps", "count"),
-    ("Sleep Duration", "hours"),
+    ("Sleep Duration", "minutes"),
     ("Water Intake", "oz"),
 ]
 

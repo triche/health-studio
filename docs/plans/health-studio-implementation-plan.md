@@ -425,10 +425,16 @@ Each phase is scoped to be implementable in a single LLM session and results in 
 - Backend: CRUD for metric types and metric entries; trend endpoint returning time-series data
 - Frontend: Metrics page — type selector, entry log form, Plotly trend chart
 - Ability to add custom metric types from the UI
+- Duration input: metric types with unit `"minutes"` render hours + minutes inputs; stored as total minutes, displayed as `Xh Ym`
+- Seed data: default metric types and exercise types populated via `entrypoint.sh` on first container start (idempotent — safe on every restart, no lifespan seeding)
+- Sleep Duration seed unit changed from `"hours"` to `"minutes"` for proper hours+minutes UX
+- 7-day running average: toggle checkbox above the chart adds a dashed teal trend line; carries forward last known value for days without entries
+- Chart: Plotly legend text set to white (`#F1F5F9`) for visibility on dark background
+- Basic sidebar navigation: logo + "Health Studio" header, NavLink entries for Journal and Metrics (moved forward from Phase 9 for usability during development)
 
 **Tests** (TDD):
-- Backend: CRUD for types and entries; trend endpoint returns correct shape
-- Frontend: Renders metric type list; logs an entry; chart renders with data
+- Backend: CRUD for types and entries; trend endpoint returns correct shape; seed function populates defaults and is idempotent
+- Frontend: Renders metric type list; logs an entry; chart renders with data; 7-day average toggle adds second trace; hours+minutes inputs for duration types; duration display formatting
 
 ---
 
