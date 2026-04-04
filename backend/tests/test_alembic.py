@@ -1,4 +1,5 @@
 """Tests for Alembic migrations."""
+
 from __future__ import annotations
 
 import os
@@ -16,9 +17,7 @@ def test_alembic_migration_applies_cleanly():
         db_path = os.path.join(tmpdir, "test.db")
         db_url = f"sqlite:///{db_path}"
 
-        alembic_cfg = Config(
-            os.path.join(os.path.dirname(__file__), "..", "alembic.ini")
-        )
+        alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
         alembic_cfg.set_main_option("sqlalchemy.url", db_url)
 
         command.upgrade(alembic_cfg, "head")
