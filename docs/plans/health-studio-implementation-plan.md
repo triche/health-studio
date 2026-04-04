@@ -664,6 +664,7 @@ Each phase is scoped to be implementable in a single LLM session and results in 
   - **Responsive layout**: Key flows work at mobile viewport widths
 - CI integration: Playwright tests run as a separate job in `.github/workflows/ci.yml` after the unit test jobs pass
 - Test data seeding: a fixture or setup script that populates the database with known test data before each test suite run; teardown after
+- **Important**: This should only run on the server. When we run locally during development skil this stage as it will be expensive and time consuming. The exception is if the user asks for it explicitly, then it's fine to run. But when copilot-instructions.md says "run CI on all major changes" you should not run the Playwright E2E tests by default.
 
 **Tests**:
 - All E2E scenarios listed above pass against a clean Docker Compose stack

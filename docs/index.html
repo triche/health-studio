@@ -25,6 +25,7 @@
       }
       h1 { color: var(--primary); margin-bottom: 0.5rem; }
       h2 { color: var(--accent); margin-top: 2rem; margin-bottom: 0.5rem; }
+      h3 { color: var(--secondary); margin-top: 1.5rem; margin-bottom: 0.5rem; }
       p { margin-bottom: 1rem; }
       code {
         background: var(--surface);
@@ -32,9 +33,20 @@
         border-radius: 4px;
         font-size: 0.9em;
       }
+      pre {
+        background: var(--surface);
+        padding: 1rem;
+        border-radius: 8px;
+        overflow-x: auto;
+        margin-bottom: 1rem;
+      }
+      pre code { background: none; padding: 0; }
       a { color: var(--accent); }
       ul { margin-left: 1.5rem; margin-bottom: 1rem; }
       li { margin-bottom: 0.25rem; }
+      table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
+      th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--surface); }
+      th { color: var(--accent); font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em; }
     </style>
   </head>
   <body>
@@ -50,12 +62,39 @@
 
     <h2>Features</h2>
     <ul>
-      <li>Journal entries with Markdown support</li>
-      <li>Body metrics tracking with trend visualization</li>
-      <li>Exercise results and PR tracking</li>
-      <li>Goal setting with progress tracking</li>
-      <li>Interactive Plotly.js charts</li>
-      <li>Dark mode by default</li>
+      <li><strong>Journal</strong> — Markdown entries with rich editing and preview</li>
+      <li><strong>Metrics</strong> — Body metrics tracking with interactive Plotly.js trend charts and 7-day moving averages</li>
+      <li><strong>Results</strong> — Exercise results with automatic PR detection across Olympic lifts, powerlifts, CrossFit benchmarks, and running</li>
+      <li><strong>Goals</strong> — Goal setting linked to metrics or exercises with progress tracking and Markdown plans</li>
+      <li><strong>Dashboard</strong> — Aggregated overview of recent activity, active goals, latest metrics, and PRs</li>
+      <li><strong>Dark/Light mode</strong> — Toggle between themes; preference persisted</li>
+      <li><strong>Responsive layout</strong> — Collapsible sidebar for mobile</li>
+      <li><strong>CLI</strong> — Command-line interface for managing data from the terminal</li>
+    </ul>
+
+    <h2>Quick Start</h2>
+    <p>Run <code>docker compose up</code> and visit
+      <a href="http://localhost:3000">http://localhost:3000</a>.
+    </p>
+    <table>
+      <tr><th>Service</th><th>URL</th></tr>
+      <tr><td>Frontend</td><td><a href="http://localhost:3000">http://localhost:3000</a></td></tr>
+      <tr><td>Backend API</td><td><a href="http://localhost:8000">http://localhost:8000</a></td></tr>
+      <tr><td>API Docs (Swagger)</td><td><a href="http://localhost:8000/docs">http://localhost:8000/docs</a></td></tr>
+      <tr><td>Health Check</td><td><a href="http://localhost:8000/api/health">http://localhost:8000/api/health</a></td></tr>
+    </table>
+
+    <h2>Architecture</h2>
+    <pre><code>┌────────────────┐      ┌────────────────┐      ┌──────────┐
+│   React SPA    │─────▶│  FastAPI        │─────▶│  SQLite  │
+│  (Vite + TS)   │ REST │  (Python 3.12) │      │          │
+│  port 3000     │      │  port 8000     │      │ data/    │
+└────────────────┘      └────────────────┘      └──────────┘</code></pre>
+    <ul>
+      <li><strong>Frontend</strong>: React 19, TypeScript, Tailwind CSS, Plotly.js, react-markdown</li>
+      <li><strong>Backend</strong>: FastAPI, SQLAlchemy, Alembic, py_webauthn</li>
+      <li><strong>Database</strong>: SQLite — zero-config, file-based</li>
+      <li><strong>Auth</strong>: WebAuthn/Passkeys (passwordless) + scoped API keys</li>
     </ul>
 
     <h2>Security</h2>
@@ -70,9 +109,73 @@
       <li>No stack traces in production error responses</li>
     </ul>
 
-    <h2>Quick Start</h2>
-    <p>Run <code>docker compose up</code> and visit
-      <a href="http://localhost:3000">http://localhost:3000</a>.
-    </p>
+    <h2>API Reference</h2>
+    <p>All endpoints are prefixed with <code>/api</code>. Full interactive docs available at <a href="http://localhost:8000/docs">/docs</a>.</p>
+
+    <h3>Auth</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/auth/status</code></td><td>Check registration and auth state</td></tr>
+      <tr><td>POST</td><td><code>/api/auth/register</code></td><td>Begin passkey registration</td></tr>
+      <tr><td>POST</td><td><code>/api/auth/register/complete</code></td><td>Complete registration</td></tr>
+      <tr><td>POST</td><td><code>/api/auth/login</code></td><td>Begin passkey authentication</td></tr>
+      <tr><td>POST</td><td><code>/api/auth/login/complete</code></td><td>Complete authentication</td></tr>
+      <tr><td>POST</td><td><code>/api/auth/logout</code></td><td>Invalidate session</td></tr>
+    </table>
+
+    <h3>Journal</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/journals</code></td><td>List entries (paginated)</td></tr>
+      <tr><td>POST</td><td><code>/api/journals</code></td><td>Create entry</td></tr>
+      <tr><td>GET</td><td><code>/api/journals/{id}</code></td><td>Get single entry</td></tr>
+      <tr><td>PUT</td><td><code>/api/journals/{id}</code></td><td>Update entry</td></tr>
+      <tr><td>DELETE</td><td><code>/api/journals/{id}</code></td><td>Delete entry</td></tr>
+    </table>
+
+    <h3>Metrics</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/metric-types</code></td><td>List metric types</td></tr>
+      <tr><td>POST</td><td><code>/api/metric-types</code></td><td>Create metric type</td></tr>
+      <tr><td>GET</td><td><code>/api/metrics</code></td><td>List metric entries</td></tr>
+      <tr><td>POST</td><td><code>/api/metrics</code></td><td>Log a metric entry</td></tr>
+      <tr><td>GET</td><td><code>/api/metrics/trends/{type_id}</code></td><td>Get trend data</td></tr>
+    </table>
+
+    <h3>Results</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/exercise-types</code></td><td>List exercise types</td></tr>
+      <tr><td>POST</td><td><code>/api/exercise-types</code></td><td>Create exercise type</td></tr>
+      <tr><td>GET</td><td><code>/api/results</code></td><td>List result entries</td></tr>
+      <tr><td>POST</td><td><code>/api/results</code></td><td>Log a result</td></tr>
+      <tr><td>GET</td><td><code>/api/results/prs/{exercise_type_id}</code></td><td>PR history</td></tr>
+      <tr><td>GET</td><td><code>/api/results/trends/{exercise_type_id}</code></td><td>Trend data</td></tr>
+    </table>
+
+    <h3>Goals</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/goals</code></td><td>List goals</td></tr>
+      <tr><td>POST</td><td><code>/api/goals</code></td><td>Create goal</td></tr>
+      <tr><td>GET</td><td><code>/api/goals/{id}</code></td><td>Get goal with progress</td></tr>
+      <tr><td>PUT</td><td><code>/api/goals/{id}</code></td><td>Update goal</td></tr>
+      <tr><td>DELETE</td><td><code>/api/goals/{id}</code></td><td>Delete goal</td></tr>
+    </table>
+
+    <h3>Dashboard</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/dashboard/summary</code></td><td>Aggregated overview</td></tr>
+    </table>
+
+    <h2>CLI</h2>
+    <p>Install the CLI for terminal-based access:</p>
+    <pre><code>cd cli && pip install -e ".[dev]"
+hs config init
+hs config set url http://localhost:8000
+hs config set api-key &lt;your-key&gt;</code></pre>
+    <p>Available commands: <code>hs dashboard</code>, <code>hs journal</code>, <code>hs metrics</code>, <code>hs results</code>, <code>hs goals</code>, <code>hs config</code>.</p>
   </body>
 </html>

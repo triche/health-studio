@@ -1,3 +1,16 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: 241 245 249; /* slate-100 */
+    --color-surface: 255 255 255; /* white */
+    --color-text: 15 23 42; /* slate-900 */
+  }
+  .dark {
+    --color-bg: 15 23 42; /* #0F172A */
+    --color-surface: 30 41 59; /* #1E293B */
+    --color-text: 241 245 249; /* #F1F5F9 */
+  }
+}

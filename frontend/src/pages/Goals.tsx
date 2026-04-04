@@ -29,6 +29,14 @@ export default function Goals() {
   const [lowerIsBetter, setLowerIsBetter] = useState(false);
   const [deadline, setDeadline] = useState("");
 
+  // Time entry state
+  const [targetHours, setTargetHours] = useState("");
+  const [targetMinutes, setTargetMinutes] = useState("");
+  const [targetSeconds, setTargetSeconds] = useState("");
+  const [startHours, setStartHours] = useState("");
+  const [startMinutes, setStartMinutes] = useState("");
+  const [startSeconds, setStartSeconds] = useState("");
+
   const loadGoals = useCallback(async () => {
     try {
       const params: { status?: string } = {};
@@ -68,13 +76,59 @@ export default function Goals() {
     setStartValue("");
     setLowerIsBetter(false);
     setDeadline("");
+    setTargetHours("");
+    setTargetMinutes("");
+    setTargetSeconds("");
+    setStartHours("");
+    setStartMinutes("");
+    setStartSeconds("");
     setEditingGoal(null);
     setShowForm(false);
+  };
+
+  const getFormTimeMode = (): "seconds" | "minutes" | null => {
+    if (targetType === "result") {
+      const et = exerciseTypes.find((e) => e.id === targetId);
+      if (et?.result_unit === "seconds" || et?.result_unit === "time") return "seconds";
+    } else {
+      const mt = metricTypes.find((m) => m.id === targetId);
+      if (mt?.unit === "minutes") return "minutes";
+    }
+    return null;
+  };
+
+  const formTimeMode = getFormTimeMode();
+
+  const computeTimeValue = (
+    h: string,
+    m: string,
+    s: string,
+    mode: "seconds" | "minutes",
+  ): number => {
+    if (mode === "seconds") {
+      return parseInt(h || "0", 10) * 3600 + parseInt(m || "0", 10) * 60 + parseInt(s || "0", 10);
+    }
+    return parseInt(h || "0", 10) * 60 + parseInt(m || "0", 10);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const resolvedTarget = formTimeMode
+        ? computeTimeValue(targetHours, targetMinutes, targetSeconds, formTimeMode)
+        : parseFloat(targetValue);
+      const resolvedStart = formTimeMode
+        ? targetHours ||
+          targetMinutes ||
+          targetSeconds ||
+          startHours ||
+          startMinutes ||
+          startSeconds
+          ? computeTimeValue(startHours, startMinutes, startSeconds, formTimeMode)
+          : null
+        : startValue
+          ? parseFloat(startValue)
+          : null;
       if (editingGoal) {
         await updateGoal(editingGoal.id, {
           title,
@@ -82,8 +136,12 @@ export default function Goals() {
           plan,
           target_type: targetType,
           target_id: targetId,
-          target_value: parseFloat(targetValue),
-          start_value: startValue ? parseFloat(startValue) : null,
+          target_value: resolvedTarget,
+          start_value: formTimeMode
+            ? startHours || startMinutes || startSeconds
+              ? resolvedStart
+              : null
+            : resolvedStart,
           lower_is_better: lowerIsBetter,
           deadline: deadline || undefined,
         });
@@ -94,10 +152,12 @@ export default function Goals() {
           plan,
           target_type: targetType,
           target_id: targetId,
-          target_value: parseFloat(targetValue),
+          target_value: resolvedTarget,
           lower_is_better: lowerIsBetter,
         };
-        if (startValue) data.start_value = parseFloat(startValue);
+        if (formTimeMode) {
+          if (startHours || startMinutes || startSeconds) data.start_value = resolvedStart!;
+        } else if (startValue) data.start_value = parseFloat(startValue);
         if (deadline) data.deadline = deadline;
         await createGoal(data);
       }
@@ -115,10 +175,53 @@ export default function Goals() {
     setPlan(goal.plan);
     setTargetType(goal.target_type);
     setTargetId(goal.target_id);
-    setTargetValue(String(goal.target_value));
-    setStartValue(goal.start_value != null ? String(goal.start_value) : "");
     setLowerIsBetter(goal.lower_is_better);
     setDeadline(goal.deadline || "");
+
+    const timeMode = getTimeModeForGoal(goal);
+    if (timeMode === "seconds") {
+      const tv = goal.target_value;
+      setTargetHours(String(Math.floor(tv / 3600)));
+      setTargetMinutes(String(Math.floor((tv % 3600) / 60)));
+      setTargetSeconds(String(Math.round(tv % 60)));
+      setTargetValue("");
+      if (goal.start_value != null) {
+        const sv = goal.start_value;
+        setStartHours(String(Math.floor(sv / 3600)));
+        setStartMinutes(String(Math.floor((sv % 3600) / 60)));
+        setStartSeconds(String(Math.round(sv % 60)));
+      } else {
+        setStartHours("");
+        setStartMinutes("");
+        setStartSeconds("");
+      }
+      setStartValue("");
+    } else if (timeMode === "minutes") {
+      const tv = goal.target_value;
+      setTargetHours(String(Math.floor(tv / 60)));
+      setTargetMinutes(String(Math.round(tv % 60)));
+      setTargetSeconds("");
+      setTargetValue("");
+      if (goal.start_value != null) {
+        const sv = goal.start_value;
+        setStartHours(String(Math.floor(sv / 60)));
+        setStartMinutes(String(Math.round(sv % 60)));
+        setStartSeconds("");
+      } else {
+        setStartHours("");
+        setStartMinutes("");
+      }
+      setStartValue("");
+    } else {
+      setTargetValue(String(goal.target_value));
+      setStartValue(goal.start_value != null ? String(goal.start_value) : "");
+      setTargetHours("");
+      setTargetMinutes("");
+      setTargetSeconds("");
+      setStartHours("");
+      setStartMinutes("");
+      setStartSeconds("");
+    }
     setShowForm(true);
   };
 
@@ -147,6 +250,41 @@ export default function Goals() {
     }
     const et = exerciseTypes.find((e) => e.id === goal.target_id);
     return et ? `${et.name} (${et.result_unit})` : goal.target_id;
+  };
+
+  const getTimeModeForGoal = (goal: Goal): "seconds" | "minutes" | null => {
+    if (goal.target_type === "result") {
+      const et = exerciseTypes.find((e) => e.id === goal.target_id);
+      if (et?.result_unit === "seconds" || et?.result_unit === "time") return "seconds";
+    } else if (goal.target_type === "metric") {
+      const mt = metricTypes.find((m) => m.id === goal.target_id);
+      if (mt?.unit === "minutes") return "minutes";
+    }
+    return null;
+  };
+
+  const formatTime = (totalSeconds: number): string => {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = Math.round(totalSeconds % 60);
+    const parts: string[] = [];
+    if (h > 0) parts.push(`${h}h`);
+    if (m > 0) parts.push(`${m}m`);
+    if (s > 0 || parts.length === 0) parts.push(`${s}s`);
+    return parts.join(" ");
+  };
+
+  const formatDuration = (totalMinutes: number): string => {
+    const h = Math.floor(totalMinutes / 60);
+    const m = Math.round(totalMinutes % 60);
+    return `${h}h ${m}m`;
+  };
+
+  const formatGoalValue = (goal: Goal, value: number): string => {
+    const mode = getTimeModeForGoal(goal);
+    if (mode === "seconds") return formatTime(value);
+    if (mode === "minutes") return formatDuration(value);
+    return String(value);
   };
 
   const targetOptions =
@@ -277,34 +415,143 @@ export default function Goals() {
             </div>
           </div>
           <div className="mb-3 grid grid-cols-3 gap-3">
-            <div>
-              <label htmlFor="target-value" className="mb-1 block text-sm text-light-text/70">
-                Target Value
-              </label>
-              <input
-                id="target-value"
-                type="number"
-                step="any"
-                value={targetValue}
-                onChange={(e) => setTargetValue(e.target.value)}
-                className="w-full rounded-lg border border-light-text/20 bg-dark-bg px-3 py-2 text-light-text"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="start-value" className="mb-1 block text-sm text-light-text/70">
-                Starting Value
-              </label>
-              <input
-                id="start-value"
-                type="number"
-                step="any"
-                value={startValue}
-                onChange={(e) => setStartValue(e.target.value)}
-                className="w-full rounded-lg border border-light-text/20 bg-dark-bg px-3 py-2 text-light-text"
-                placeholder="Optional"
-              />
-            </div>
+            {formTimeMode ? (
+              <>
+                <div>
+                  <label className="mb-1 block text-sm text-light-text/70">Target Value</label>
+                  <div className="flex gap-1">
+                    <div>
+                      <label htmlFor="target-hours" className="sr-only">
+                        Target Hours
+                      </label>
+                      <input
+                        id="target-hours"
+                        type="number"
+                        min="0"
+                        placeholder="h"
+                        value={targetHours}
+                        onChange={(e) => setTargetHours(e.target.value)}
+                        className="w-full rounded-lg border border-light-text/20 bg-dark-bg px-2 py-2 text-light-text"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="target-minutes" className="sr-only">
+                        Target Minutes
+                      </label>
+                      <input
+                        id="target-minutes"
+                        type="number"
+                        min="0"
+                        max="59"
+                        placeholder="m"
+                        value={targetMinutes}
+                        onChange={(e) => setTargetMinutes(e.target.value)}
+                        className="w-full rounded-lg border border-light-text/20 bg-dark-bg px-2 py-2 text-light-text"
+                      />
+                    </div>
+                    {formTimeMode === "seconds" && (
+                      <div>
+                        <label htmlFor="target-seconds" className="sr-only">
+                          Target Seconds
+                        </label>
+                        <input
+                          id="target-seconds"
+                          type="number"
+                          min="0"
+                          max="59"
+                          placeholder="s"
+                          value={targetSeconds}
+                          onChange={(e) => setTargetSeconds(e.target.value)}
+                          className="w-full rounded-lg border border-light-text/20 bg-dark-bg px-2 py-2 text-light-text"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm text-light-text/70">Starting Value</label>
+                  <div className="flex gap-1">
+                    <div>
+                      <label htmlFor="start-hours" className="sr-only">
+                        Start Hours
+                      </label>
+                      <input
+                        id="start-hours"
+                        type="number"
+                        min="0"
+                        placeholder="h"
+                        value={startHours}
+                        onChange={(e) => setStartHours(e.target.value)}
+                        className="w-full rounded-lg border border-light-text/20 bg-dark-bg px-2 py-2 text-light-text"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="start-minutes" className="sr-only">
+                        Start Minutes
+                      </label>
+                      <input
+                        id="start-minutes"
+                        type="number"
+                        min="0"
+                        max="59"
+                        placeholder="m"
+                        value={startMinutes}
+                        onChange={(e) => setStartMinutes(e.target.value)}
+                        className="w-full rounded-lg border border-light-text/20 bg-dark-bg px-2 py-2 text-light-text"
+                      />
+                    </div>
+                    {formTimeMode === "seconds" && (
+                      <div>
+                        <label htmlFor="start-seconds" className="sr-only">
+                          Start Seconds
+                        </label>
+                        <input
+                          id="start-seconds"
+                          type="number"
+                          min="0"
+                          max="59"
+                          placeholder="s"
+                          value={startSeconds}
+                          onChange={(e) => setStartSeconds(e.target.value)}
+                          className="w-full rounded-lg border border-light-text/20 bg-dark-bg px-2 py-2 text-light-text"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label htmlFor="target-value" className="mb-1 block text-sm text-light-text/70">
+                    Target Value
+                  </label>
+                  <input
+                    id="target-value"
+                    type="number"
+                    step="any"
+                    value={targetValue}
+                    onChange={(e) => setTargetValue(e.target.value)}
+                    className="w-full rounded-lg border border-light-text/20 bg-dark-bg px-3 py-2 text-light-text"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="start-value" className="mb-1 block text-sm text-light-text/70">
+                    Starting Value
+                  </label>
+                  <input
+                    id="start-value"
+                    type="number"
+                    step="any"
+                    value={startValue}
+                    onChange={(e) => setStartValue(e.target.value)}
+                    className="w-full rounded-lg border border-light-text/20 bg-dark-bg px-3 py-2 text-light-text"
+                    placeholder="Optional"
+                  />
+                </div>
+              </>
+            )}
             <div>
               <label htmlFor="deadline" className="mb-1 block text-sm text-light-text/70">
                 Deadline
@@ -364,8 +611,9 @@ export default function Goals() {
                     <p className="mt-1 text-sm text-light-text/70">{goal.description}</p>
                   )}
                   <p className="mt-1 text-xs text-light-text/50">
-                    Target: {getTargetName(goal)} → {goal.target_value}
-                    {goal.start_value != null && ` · Start: ${goal.start_value}`}
+                    Target: {getTargetName(goal)} → {formatGoalValue(goal, goal.target_value)}
+                    {goal.start_value != null &&
+                      ` · Start: ${formatGoalValue(goal, goal.start_value)}`}
                     {goal.deadline && ` · Due: ${goal.deadline}`}
                   </p>
                   <p className="mt-1 text-xs text-light-text/50">
@@ -400,7 +648,8 @@ export default function Goals() {
               <div className="mt-3">
                 <div className="mb-1 flex justify-between text-xs text-light-text/70">
                   <span>
-                    {goal.current_value} / {goal.target_value}
+                    {formatGoalValue(goal, goal.current_value)} /{" "}
+                    {formatGoalValue(goal, goal.target_value)}
                   </span>
                   <span>{Math.round(goal.progress)}%</span>
                 </div>
