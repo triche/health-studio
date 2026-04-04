@@ -23,7 +23,7 @@ export default function Metrics() {
   // New type form
   const [newTypeName, setNewTypeName] = useState("");
   const [newTypeUnit, setNewTypeUnit] = useState("");
-  const [showNewType, setShowNewType] = useState(false);
+  const [showManage, setShowManage] = useState(false);
 
   // New entry form
   const [entryValue, setEntryValue] = useState("");
@@ -87,7 +87,7 @@ export default function Metrics() {
       setSelectedTypeId(created.id);
       setNewTypeName("");
       setNewTypeUnit("");
-      setShowNewType(false);
+      setShowManage(false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create metric type");
     }
@@ -223,61 +223,81 @@ export default function Metrics() {
 
       {/* Type selector */}
       <div className="mb-6">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          {types.map((t) => (
-            <div key={t.id} className="flex items-center">
-              <button
-                onClick={() => setSelectedTypeId(t.id)}
-                className={`rounded-l-lg px-3 py-1.5 text-sm font-medium ${
-                  selectedTypeId === t.id
-                    ? "bg-primary text-white"
-                    : "bg-dark-surface text-light-text hover:bg-gray-600"
-                }`}
+        <div className="mb-2 flex items-center gap-3">
+          {types.length > 0 && (
+            <>
+              <label htmlFor="metric-type-select" className="text-sm font-medium text-light-text">
+                Metric type
+              </label>
+              <select
+                id="metric-type-select"
+                value={selectedTypeId ?? ""}
+                onChange={(e) => setSelectedTypeId(e.target.value)}
+                className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
               >
-                {t.name} ({t.unit})
-              </button>
-              <button
-                onClick={() => handleDeleteType(t.id)}
-                className="rounded-r-lg bg-dark-surface px-2 py-1.5 text-sm text-red-400 hover:bg-red-900/50 hover:text-red-300"
-                aria-label={`Delete ${t.name}`}
-              >
-                ×
-              </button>
-            </div>
-          ))}
+                {types.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.unit})
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           <button
-            onClick={() => setShowNewType((p) => !p)}
+            onClick={() => setShowManage((p) => !p)}
+            aria-label="Manage types"
             className="rounded-lg bg-dark-surface px-3 py-1.5 text-sm text-accent hover:bg-gray-600"
           >
-            + Add Type
+            Manage
           </button>
         </div>
 
-        {showNewType && (
-          <form onSubmit={handleCreateType} className="flex gap-2">
-            <input
-              type="text"
-              value={newTypeName}
-              onChange={(e) => setNewTypeName(e.target.value)}
-              placeholder="Name (e.g. Weight)"
-              required
-              className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
-            />
-            <input
-              type="text"
-              value={newTypeUnit}
-              onChange={(e) => setNewTypeUnit(e.target.value)}
-              placeholder="Unit (e.g. lbs)"
-              required
-              className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
-            />
-            <button
-              type="submit"
-              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
-            >
-              Create
-            </button>
-          </form>
+        {showManage && (
+          <div className="mt-2 rounded-lg bg-dark-surface p-4">
+            {types.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {types.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center gap-1 rounded-lg bg-gray-700 px-2 py-1"
+                  >
+                    <span className="text-sm text-light-text">{t.name}</span>
+                    <button
+                      onClick={() => handleDeleteType(t.id)}
+                      className="text-sm text-red-400 hover:text-red-300"
+                      aria-label={`Delete ${t.name}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <form onSubmit={handleCreateType} className="flex gap-2">
+              <input
+                type="text"
+                value={newTypeName}
+                onChange={(e) => setNewTypeName(e.target.value)}
+                placeholder="Name (e.g. Weight)"
+                required
+                className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
+              />
+              <input
+                type="text"
+                value={newTypeUnit}
+                onChange={(e) => setNewTypeUnit(e.target.value)}
+                placeholder="Unit (e.g. lbs)"
+                required
+                className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
+              >
+                Create
+              </button>
+            </form>
+          </div>
         )}
       </div>
 

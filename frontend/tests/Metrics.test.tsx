@@ -453,4 +453,116 @@ describe("Metrics", () => {
     expect(screen.getByText("185")).toBeInTheDocument();
     expect(mockUpdateMetricEntry).not.toHaveBeenCalled();
   });
+
+  it("renders metric types in a dropdown select", async () => {
+    mockListMetricTypes.mockResolvedValue([
+      { id: "1", name: "Weight", unit: "lbs", created_at: "2025-01-01T00:00:00" },
+      { id: "2", name: "Steps", unit: "count", created_at: "2025-01-01T00:00:00" },
+    ]);
+    mockListMetricEntries.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 50 });
+    mockGetMetricTrend.mockResolvedValue({
+      metric_type_id: "1",
+      metric_name: "Weight",
+      unit: "lbs",
+      data: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <Metrics />
+      </MemoryRouter>,
+    );
+
+    const select = await screen.findByLabelText("Metric type");
+    expect(select.tagName).toBe("SELECT");
+    expect(select).toHaveValue("1");
+  });
+
+  it("switches metric type via dropdown", async () => {
+    const user = userEvent.setup();
+    mockListMetricTypes.mockResolvedValue([
+      { id: "1", name: "Weight", unit: "lbs", created_at: "2025-01-01T00:00:00" },
+      { id: "2", name: "Steps", unit: "count", created_at: "2025-01-01T00:00:00" },
+    ]);
+    mockListMetricEntries.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 50 });
+    mockGetMetricTrend.mockResolvedValue({
+      metric_type_id: "1",
+      metric_name: "Weight",
+      unit: "lbs",
+      data: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <Metrics />
+      </MemoryRouter>,
+    );
+
+    const select = await screen.findByLabelText("Metric type");
+    await user.selectOptions(select, "2");
+
+    await waitFor(() => {
+      expect(mockGetMetricTrend).toHaveBeenCalledWith("2");
+    });
+  });
+
+  it("shows manage panel with type list and create form", async () => {
+    const user = userEvent.setup();
+    mockListMetricTypes.mockResolvedValue([
+      { id: "1", name: "Weight", unit: "lbs", created_at: "2025-01-01T00:00:00" },
+    ]);
+    mockListMetricEntries.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 50 });
+    mockGetMetricTrend.mockResolvedValue({
+      metric_type_id: "1",
+      metric_name: "Weight",
+      unit: "lbs",
+      data: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <Metrics />
+      </MemoryRouter>,
+    );
+
+    await screen.findByLabelText("Metric type");
+
+    // Manage panel hidden by default
+    expect(screen.queryByLabelText("Delete Weight")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Manage types" }));
+
+    // Should show delete button for existing type and create form
+    expect(screen.getByLabelText("Delete Weight")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Name (e.g. Weight)")).toBeInTheDocument();
+  });
+
+  it("toggles manage panel closed", async () => {
+    const user = userEvent.setup();
+    mockListMetricTypes.mockResolvedValue([
+      { id: "1", name: "Weight", unit: "lbs", created_at: "2025-01-01T00:00:00" },
+    ]);
+    mockListMetricEntries.mockResolvedValue({ items: [], total: 0, page: 1, per_page: 50 });
+    mockGetMetricTrend.mockResolvedValue({
+      metric_type_id: "1",
+      metric_name: "Weight",
+      unit: "lbs",
+      data: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <Metrics />
+      </MemoryRouter>,
+    );
+
+    await screen.findByLabelText("Metric type");
+
+    const manageBtn = screen.getByRole("button", { name: "Manage types" });
+    await user.click(manageBtn);
+    expect(screen.getByLabelText("Delete Weight")).toBeInTheDocument();
+
+    await user.click(manageBtn);
+    expect(screen.queryByLabelText("Delete Weight")).not.toBeInTheDocument();
+  });
 });
