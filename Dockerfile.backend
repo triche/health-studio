@@ -9,6 +9,8 @@ RUN pip install --no-cache-dir . && pip install --no-cache-dir ".[dev]"
 
 COPY . .
 
+RUN mkdir -p /app/data && chown -R appuser:appgroup /app/data
+
 USER appuser
 
 EXPOSE 8000
