@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
+import { ToastProvider } from "./components/Toast";
 import Dashboard from "./pages/Dashboard";
 import JournalList from "./pages/JournalList";
 import JournalEdit from "./pages/JournalEdit";
@@ -70,22 +71,24 @@ function App() {
   // Authenticated — show app
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-dark-bg">
-        <Sidebar onLogout={handleLogout} />
-        <div className="ml-48">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/journals" element={<JournalList />} />
-            <Route path="/journals/new" element={<JournalEdit />} />
-            <Route path="/journals/:id" element={<JournalEdit />} />
-            <Route path="/metrics" element={<Metrics />} />
-            <Route path="/results" element={<Results />} />
-            <Route path="/goals" element={<Goals />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
+      <ToastProvider>
+        <div className="min-h-screen bg-dark-bg text-light-text">
+          <Sidebar onLogout={handleLogout} />
+          <div className="pt-14 md:ml-48 md:pt-0">
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/journals" element={<JournalList />} />
+              <Route path="/journals/new" element={<JournalEdit />} />
+              <Route path="/journals/:id" element={<JournalEdit />} />
+              <Route path="/metrics" element={<Metrics />} />
+              <Route path="/results" element={<Results />} />
+              <Route path="/goals" element={<Goals />} />
+              <Route path="/settings" element={<Settings />} />
+            </Routes>
+          </div>
         </div>
-      </div>
+      </ToastProvider>
     </BrowserRouter>
   );
 }
