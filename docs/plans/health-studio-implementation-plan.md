@@ -548,8 +548,8 @@ Each phase is scoped to be implementable in a single LLM session and results in 
 #### CLI Core
 - Standalone Python package in `cli/` with its own `pyproject.toml`
 - Entry point: `hs` (via `[project.scripts]` in `pyproject.toml`)
-- Built with Typer (command framework) + Rich (terminal formatting) + httpx (async HTTP client)
-- ASCII art logo banner displayed on `hs --help` and `hs` (no args):
+- Built with Typer (command framework) + Rich (terminal formatting) + httpx (sync HTTP client)
+- ASCII art logo banner displayed on `hs` (no args); `hs --help` shows standard Typer help with banner:
   ```
   ╦ ╦╔═╗╔═╗╦ ╔╦╗╦ ╦  ╔═╗╔╦╗╦ ╦╔╦╗╦╔═╗
   ╠═╣║╣ ╠═╣║  ║ ╠═╣  ╚═╗ ║ ║ ║ ║║║║ ║
@@ -579,10 +579,10 @@ Each phase is scoped to be implementable in a single LLM session and results in 
 - `hs journal create --title "..." --editor` — open `$EDITOR` to compose, then submit
 - `hs metrics types` — list metric types
 - `hs metrics log <type> <value> [--date DATE] [--notes "..."]` — log a metric entry
-- `hs metrics trend <type> [--since DATE]` — ASCII sparkline or table of recent values
+- `hs metrics trend <type> [--since DATE]` — table of recent values (ASCII sparkline deferred to Phase 9 polish)
 - `hs results types` — list exercise types
 - `hs results log <exercise> <value> [--date DATE] [--notes "..."]` — log a result
-- `hs results prs [exercise]` — show PR table
+- `hs results prs <exercise>` — show PR table for a specific exercise
 - `hs goals list [--status active|completed|abandoned]` — list goals
 - `hs goals show <id>` — show goal detail with progress
 - `hs dashboard` — compact summary (mirrors the web dashboard)
@@ -590,7 +590,8 @@ Each phase is scoped to be implementable in a single LLM session and results in 
 #### Install Scripts
 - `cli/scripts/install.sh` (macOS/Linux):
   - Checks for Python ≥ 3.11; installs via `pipx install .` if `pipx` is available, otherwise `pip install --user .`
-  - Verifies `hs` is on `$PATH`; if not, prints the path to add
+  - Detects active virtualenv and uses `pip install` without `--user` in that case (avoids `--user` conflict inside venvs)
+  - Verifies `hs` is on `$PATH`; if not, auto-appends PATH export to `~/.zshrc`, `~/.bashrc`, and `~/.bash_profile` (whichever exist) for both zsh and bash support on macOS
   - Creates `~/.health-studio/` directory with `700` permissions
   - Prints post-install instruction: "Run `hs config init` to connect to your Health Studio instance"
 - `cli/scripts/install.ps1` (Windows PowerShell): equivalent logic using `pipx` or `pip install --user`
@@ -602,12 +603,25 @@ Each phase is scoped to be implementable in a single LLM session and results in 
 - httpx client sends API key via `Authorization: Bearer <key>` header — never in query params or URLs
 - All user-supplied arguments are passed as request body/params — never interpolated into URLs
 
-**Tests** (TDD):
+**Tests** (TDD — 35 tests):
 - Config init creates TOML file with correct structure and `600` permissions
+- Config init creates directory if missing
 - Config reader falls back to env var when config file is absent
-- Each command group calls the correct API endpoint with correct HTTP method and params (mocked httpx)
+- Env var overrides config file API key
+- Missing config and no env var raises ConfigError
+- Config show masks API key except prefix
+- Config set updates a specific value
+- Each command group calls the correct API endpoint with correct HTTP method and params (mocked httpx context manager)
 - `hs --help` output contains the ASCII art banner
+- `hs --version` outputs version string
+- `hs` with no args shows banner without error
 - `hs journal create --file` reads the file and sends content to API
+- `hs journal list` with `--since` and `--limit` passes correct query params
+- `hs metrics log` with `--date` and `--notes` sends correct body
+- `hs results prs` calls correct PR endpoint
+- `hs goals list --status` passes status query param
+- `hs goals show` displays goal title and progress
+- `hs dashboard` calls summary endpoint and displays data from all sections
 - Error responses from the API are displayed as user-friendly messages, not raw JSON
 
 ---
