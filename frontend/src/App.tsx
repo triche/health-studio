@@ -3,6 +3,7 @@ import Sidebar from "./components/Sidebar";
 import JournalList from "./pages/JournalList";
 import JournalEdit from "./pages/JournalEdit";
 import Metrics from "./pages/Metrics";
+import Results from "./pages/Results";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
             <Route path="/journals/new" element={<JournalEdit />} />
             <Route path="/journals/:id" element={<JournalEdit />} />
             <Route path="/metrics" element={<Metrics />} />
+            <Route path="/results" element={<Results />} />
           </Routes>
         </div>
       </div>

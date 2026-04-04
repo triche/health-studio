@@ -28,6 +28,12 @@ export interface MetricEntryCreate {
   notes?: string;
 }
 
+export interface MetricEntryUpdate {
+  value?: number;
+  recorded_date?: string;
+  notes?: string;
+}
+
 export interface MetricTypeCreate {
   name: string;
   unit: string;

@@ -4,6 +4,7 @@ import type {
   MetricTypeCreate,
   MetricEntry,
   MetricEntryCreate,
+  MetricEntryUpdate,
   MetricEntryListResponse,
   TrendResponse,
 } from "../types/metric";
@@ -39,6 +40,10 @@ export function listMetricEntries(params?: {
 
 export function createMetricEntry(data: MetricEntryCreate): Promise<MetricEntry> {
   return api.post<MetricEntry>("/api/metrics", data);
+}
+
+export function updateMetricEntry(id: string, data: MetricEntryUpdate): Promise<MetricEntry> {
+  return api.put<MetricEntry>(`/api/metrics/${encodeURIComponent(id)}`, data);
 }
 
 export function deleteMetricEntry(id: string): Promise<void> {

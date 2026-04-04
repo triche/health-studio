@@ -9,6 +9,7 @@ const mockCreateMetricType = vi.fn();
 const mockDeleteMetricType = vi.fn();
 const mockListMetricEntries = vi.fn();
 const mockCreateMetricEntry = vi.fn();
+const mockUpdateMetricEntry = vi.fn();
 const mockDeleteMetricEntry = vi.fn();
 const mockGetMetricTrend = vi.fn();
 
@@ -18,6 +19,7 @@ vi.mock("../src/api/metrics", () => ({
   deleteMetricType: (...args: unknown[]) => mockDeleteMetricType(...args),
   listMetricEntries: (...args: unknown[]) => mockListMetricEntries(...args),
   createMetricEntry: (...args: unknown[]) => mockCreateMetricEntry(...args),
+  updateMetricEntry: (...args: unknown[]) => mockUpdateMetricEntry(...args),
   deleteMetricEntry: (...args: unknown[]) => mockDeleteMetricEntry(...args),
   getMetricTrend: (...args: unknown[]) => mockGetMetricTrend(...args),
 }));
@@ -113,6 +115,7 @@ describe("Metrics", () => {
   });
 
   it("renders chart with trend data", async () => {
+    const user = userEvent.setup();
     mockListMetricTypes.mockResolvedValue([
       { id: "1", name: "Weight", unit: "lbs", created_at: "2025-01-01T00:00:00" },
     ]);
@@ -147,6 +150,13 @@ describe("Metrics", () => {
       </MemoryRouter>,
     );
 
+    // Chart hidden by default
+    await screen.findByText("Weight (lbs)");
+    expect(screen.queryByTestId("plotly-chart")).not.toBeInTheDocument();
+
+    // Click the show graph toggle
+    await user.click(screen.getByLabelText("Show graph"));
+
     await waitFor(() => {
       expect(screen.getByTestId("plotly-chart")).toBeInTheDocument();
     });
@@ -179,6 +189,10 @@ describe("Metrics", () => {
         <Metrics />
       </MemoryRouter>,
     );
+
+    // Show the graph first
+    await screen.findByText("Weight (lbs)");
+    await user.click(screen.getByLabelText("Show graph"));
 
     await waitFor(() => {
       expect(screen.getByTestId("plotly-chart")).toBeInTheDocument();
@@ -287,5 +301,156 @@ describe("Metrics", () => {
 
     // 450 minutes = 7h 30m
     expect(await screen.findByText("7h 30m")).toBeInTheDocument();
+  });
+
+  it("shows Edit button and enters inline edit mode on click", async () => {
+    const user = userEvent.setup();
+    mockListMetricTypes.mockResolvedValue([
+      { id: "1", name: "Weight", unit: "lbs", created_at: "2025-01-01T00:00:00" },
+    ]);
+    mockListMetricEntries.mockResolvedValue({
+      items: [
+        {
+          id: "e1",
+          metric_type_id: "1",
+          value: 185,
+          recorded_date: "2025-01-15",
+          notes: "morning",
+          created_at: "2025-01-15T00:00:00",
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 50,
+    });
+    mockGetMetricTrend.mockResolvedValue({
+      metric_type_id: "1",
+      metric_name: "Weight",
+      unit: "lbs",
+      data: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <Metrics />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("2025-01-15");
+    await user.click(screen.getByLabelText("Edit entry"));
+
+    expect(screen.getByDisplayValue("185")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("2025-01-15")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("morning")).toBeInTheDocument();
+    expect(screen.getByText("Save")).toBeInTheDocument();
+    expect(screen.getByText("Cancel")).toBeInTheDocument();
+  });
+
+  it("saves edited metric entry", async () => {
+    const user = userEvent.setup();
+    mockListMetricTypes.mockResolvedValue([
+      { id: "1", name: "Weight", unit: "lbs", created_at: "2025-01-01T00:00:00" },
+    ]);
+    mockListMetricEntries.mockResolvedValue({
+      items: [
+        {
+          id: "e1",
+          metric_type_id: "1",
+          value: 185,
+          recorded_date: "2025-01-15",
+          notes: null,
+          created_at: "2025-01-15T00:00:00",
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 50,
+    });
+    mockGetMetricTrend.mockResolvedValue({
+      metric_type_id: "1",
+      metric_name: "Weight",
+      unit: "lbs",
+      data: [],
+    });
+    mockUpdateMetricEntry.mockResolvedValue({
+      id: "e1",
+      metric_type_id: "1",
+      value: 183,
+      recorded_date: "2025-01-15",
+      notes: "after run",
+      created_at: "2025-01-15T00:00:00",
+    });
+
+    render(
+      <MemoryRouter>
+        <Metrics />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("2025-01-15");
+    await user.click(screen.getByLabelText("Edit entry"));
+
+    const valueInput = screen.getByDisplayValue("185");
+    await user.clear(valueInput);
+    await user.type(valueInput, "183");
+
+    const notesInput = screen.getByLabelText("Edit notes");
+    await user.type(notesInput, "after run");
+
+    await user.click(screen.getByText("Save"));
+
+    await waitFor(() => {
+      expect(mockUpdateMetricEntry).toHaveBeenCalledWith("e1", {
+        value: 183,
+        recorded_date: "2025-01-15",
+        notes: "after run",
+      });
+    });
+  });
+
+  it("cancels editing without saving", async () => {
+    const user = userEvent.setup();
+    mockListMetricTypes.mockResolvedValue([
+      { id: "1", name: "Weight", unit: "lbs", created_at: "2025-01-01T00:00:00" },
+    ]);
+    mockListMetricEntries.mockResolvedValue({
+      items: [
+        {
+          id: "e1",
+          metric_type_id: "1",
+          value: 185,
+          recorded_date: "2025-01-15",
+          notes: null,
+          created_at: "2025-01-15T00:00:00",
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 50,
+    });
+    mockGetMetricTrend.mockResolvedValue({
+      metric_type_id: "1",
+      metric_name: "Weight",
+      unit: "lbs",
+      data: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <Metrics />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("2025-01-15");
+    await user.click(screen.getByLabelText("Edit entry"));
+
+    const valueInput = screen.getByDisplayValue("185");
+    await user.clear(valueInput);
+    await user.type(valueInput, "999");
+
+    await user.click(screen.getByText("Cancel"));
+
+    expect(screen.getByText("185")).toBeInTheDocument();
+    expect(mockUpdateMetricEntry).not.toHaveBeenCalled();
   });
 });
