@@ -2,6 +2,11 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import App from "../src/App";
 
+vi.mock("../src/api/auth", () => ({
+  getAuthStatus: vi.fn().mockResolvedValue({ registered: true, authenticated: true }),
+  logout: vi.fn().mockResolvedValue({ status: "ok" }),
+}));
+
 vi.mock("../src/api/journals", () => ({
   listJournals: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, per_page: 20 }),
   deleteJournal: vi.fn(),
