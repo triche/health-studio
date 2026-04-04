@@ -9,6 +9,17 @@ function formatDuration(totalMinutes: number): string {
   return `${h}h ${m}m`;
 }
 
+function formatTime(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = Math.round(totalSeconds % 60);
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (s > 0 || parts.length === 0) parts.push(`${s}s`);
+  return parts.join(" ");
+}
+
 export default function Dashboard() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState("");
@@ -134,7 +145,10 @@ export default function Dashboard() {
                   </div>
                   <div className="text-right">
                     <span className="text-sm font-medium text-light-text">
-                      {pr.display_value || pr.value}
+                      {pr.display_value ||
+                        (pr.result_unit === "seconds" || pr.result_unit === "time"
+                          ? formatTime(pr.value)
+                          : pr.value)}
                     </span>
                     <span className="ml-2 text-xs text-light-text/50">{pr.recorded_date}</span>
                   </div>

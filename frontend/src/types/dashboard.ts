@@ -28,6 +28,7 @@ export interface DashboardPR {
   exercise_name: string;
   value: number;
   display_value: string | null;
+  result_unit: string | null;
   recorded_date: string;
   is_rx: boolean;
 }
