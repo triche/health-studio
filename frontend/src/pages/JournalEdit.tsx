@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 import { getJournal, createJournal, updateJournal } from "../api/journals";
 import type { JournalEntry } from "../types/journal";
@@ -111,7 +112,9 @@ export default function JournalEdit() {
 
           {preview ? (
             <div className="prose prose-invert min-h-[200px] max-w-none rounded-lg border border-gray-600 bg-dark-surface p-3">
-              <ReactMarkdown rehypePlugins={[rehypeSanitize]}>{content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                {content}
+              </ReactMarkdown>
             </div>
           ) : (
             <textarea

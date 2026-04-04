@@ -300,6 +300,7 @@ export default function Results() {
                 className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
               >
                 <option value="lbs">lbs</option>
+                <option value="reps">reps</option>
                 <option value="seconds">seconds</option>
                 <option value="time">time</option>
               </select>
