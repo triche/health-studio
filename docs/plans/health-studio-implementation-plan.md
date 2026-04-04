@@ -391,6 +391,7 @@ Each phase is scoped to be implementable in a single LLM session and results in 
 - Alembic initial migration auto-generated from models
 - CLI command (`python -m app.seed`) to populate default metric types and exercise types
 - `config.py` — settings loaded from environment variables (database path, etc.)
+- Logo: Design SVG source (`assets/logo.svg`), export transparent PNG (`frontend/public/logo.png`), favicon (`frontend/public/favicon.ico`), and mobile icon (`frontend/public/logo-192.png`); add to `index.html` *(moved from Phase 9)*
 
 **Tests**:
 - Models can be created and queried in an in-memory SQLite test database
@@ -562,7 +563,7 @@ Each phase is scoped to be implementable in a single LLM session and results in 
 **Goal**: Final UX polish, logo asset, and comprehensive documentation.
 
 **Deliverables**:
-- Logo: Design and export transparent PNG; add to header and as favicon
+- ~~Logo: Design and export transparent PNG; add to header and as favicon~~ *(moved to Phase 2)*
 - UX: Responsive sidebar; mobile breakpoints; loading states; empty states; toast notifications for actions
 - Dark mode toggle finalized and persisted
 - `README.md` fully updated with setup instructions, architecture overview, API reference summary, CLI usage, screenshots
