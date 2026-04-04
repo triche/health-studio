@@ -36,6 +36,7 @@ class ResultEntry(Base):
     display_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     recorded_date: Mapped[date] = mapped_column(Date, nullable=False)
     is_pr: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_rx: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 

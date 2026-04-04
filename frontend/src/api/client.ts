@@ -38,6 +38,10 @@ export const api = {
     return request<T>(url, { method: "PUT", body: JSON.stringify(data) });
   },
 
+  patch<T>(url: string, data: unknown): Promise<T> {
+    return request<T>(url, { method: "PATCH", body: JSON.stringify(data) });
+  },
+
   delete(url: string): Promise<void> {
     return request<void>(url, { method: "DELETE" });
   },

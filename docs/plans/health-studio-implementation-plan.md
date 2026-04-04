@@ -440,16 +440,23 @@ Each phase is scoped to be implementable in a single LLM session and results in 
 
 ### Phase 5 — Results Tracking (Backend + Frontend)
 
-**Goal**: Exercise types, result logging, PR detection, and trend visualization.
+**Goal**: Exercise types, result logging, PR detection, trend visualization, and rich editing UX.
 
 **Deliverables**:
 - Backend: CRUD for exercise types and result entries; auto-PR detection logic; PR history endpoint; trend endpoint
 - Frontend: Results page — exercise selector, result log form, PR badges, Plotly trend chart
 - Ability to add custom exercise types from the UI
+- Time-based input UX: hours/minutes/seconds inputs for time-based exercises (stored as total seconds, displayed as `Xh Ym Zs`)
+- RX checkbox for CrossFit benchmarks: `is_rx` field on `result_entries` (Alembic migration); PR logic updated so RX beats non-RX for time-based CrossFit benchmarks
+- Inline edit mode: edit value, date, notes, and RX flag directly in the results table with Save/Cancel affordance
+- PR recalculation on update: when a result's value or `is_rx` flag is edited, PR status is recalculated across all entries for that exercise (uses `exclude_id` to avoid self-comparison)
+- Show/hide graph toggle: compact icon button above the table; graphs hidden by default to keep the page focused on data entry
+- Alembic migration runs on container start (`alembic upgrade head` in `entrypoint.sh`) so new columns are applied automatically
+- Inline edit mode also added to Metrics page (edit value, date, notes) for consistency
 
 **Tests** (TDD):
-- Backend: PR is correctly flagged when a new best is logged; trend and PR endpoints return correct data
-- Frontend: Renders exercise list; logs a result; PR badge appears; chart renders
+- Backend: PR is correctly flagged when a new best is logged; trend and PR endpoints return correct data; RX PR logic (6 tests); PR recalculation on update (value change, RX flag change, unrelated field preserves PR)
+- Frontend: Renders exercise list; logs a result; PR badge appears; chart renders behind toggle; inline edit (enter, save, cancel); RX checkbox in create and edit modes
 
 ---
 
@@ -580,6 +587,33 @@ Each phase is scoped to be implementable in a single LLM session and results in 
 - Dark mode toggle persists preference
 - Responsive layout renders correctly at mobile breakpoints
 - All existing tests still pass (regression)
+
+---
+
+### Phase 10 — End-to-End Testing (Playwright)
+
+**Goal**: Add a comprehensive end-to-end test suite using Playwright to verify critical user flows against the real running application. This phase should be implemented after all feature phases are complete.
+
+**Deliverables**:
+- Playwright installed and configured in the frontend project (or a dedicated `e2e/` directory at the repo root)
+- Playwright config targeting the Docker Compose stack (`http://localhost:3000`)
+- Docker Compose test profile or script that spins up the full stack, runs Playwright, and tears down
+- E2E tests covering the core user flows:
+  - **Journal**: Create a new journal entry, verify it appears in the list, edit it, delete it
+  - **Metrics**: Create a custom metric type, log entries, verify chart renders, edit an entry, delete it
+  - **Results**: Create a custom exercise type, log results with PR detection, verify PR badge appears, edit a result, toggle RX flag, verify graph toggle
+  - **Goals**: Create a goal linked to a metric or exercise, verify progress updates, mark as completed
+  - **Dashboard**: Verify summary cards reflect data from other modules
+  - **Auth** (once implemented): Registration flow, login, logout, session expiry, API key creation
+  - **Navigation**: Sidebar links navigate correctly; browser back/forward work; deep links load the correct page
+  - **Responsive layout**: Key flows work at mobile viewport widths
+- CI integration: Playwright tests run as a separate job in `.github/workflows/ci.yml` after the unit test jobs pass
+- Test data seeding: a fixture or setup script that populates the database with known test data before each test suite run; teardown after
+
+**Tests**:
+- All E2E scenarios listed above pass against a clean Docker Compose stack
+- Tests are deterministic and do not depend on execution order
+- CI job uploads Playwright trace files and screenshots as artifacts on failure for debugging
 
 ---
 

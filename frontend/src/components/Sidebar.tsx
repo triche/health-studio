@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 const links = [
   { to: "/journals", label: "Journal" },
   { to: "/metrics", label: "Metrics" },
+  { to: "/results", label: "Results" },
 ];
 
 export default function Sidebar() {

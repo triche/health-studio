@@ -1,56 +1,59 @@
 import { useCallback, useEffect, useState } from "react";
 import Plot from "react-plotly.js";
 import {
-  listMetricTypes,
-  createMetricType,
-  deleteMetricType,
-  listMetricEntries,
-  createMetricEntry,
-  updateMetricEntry,
-  deleteMetricEntry,
-  getMetricTrend,
-} from "../api/metrics";
-import type { MetricType, MetricEntry, TrendResponse } from "../types/metric";
+  listExerciseTypes,
+  createExerciseType,
+  deleteExerciseType,
+  listResultEntries,
+  createResultEntry,
+  updateResultEntry,
+  deleteResultEntry,
+  getResultTrend,
+} from "../api/results";
+import type { ExerciseType, ResultEntry, ResultTrendResponse } from "../types/result";
 
-export default function Metrics() {
-  const [types, setTypes] = useState<MetricType[]>([]);
+export default function Results() {
+  const [types, setTypes] = useState<ExerciseType[]>([]);
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
-  const [entries, setEntries] = useState<MetricEntry[]>([]);
-  const [trend, setTrend] = useState<TrendResponse | null>(null);
+  const [entries, setEntries] = useState<ResultEntry[]>([]);
+  const [trend, setTrend] = useState<ResultTrendResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // New type form
   const [newTypeName, setNewTypeName] = useState("");
-  const [newTypeUnit, setNewTypeUnit] = useState("");
+  const [newTypeCategory, setNewTypeCategory] = useState("custom");
+  const [newTypeUnit, setNewTypeUnit] = useState("lbs");
   const [showNewType, setShowNewType] = useState(false);
 
   // New entry form
   const [entryValue, setEntryValue] = useState("");
   const [entryHours, setEntryHours] = useState("");
   const [entryMinutes, setEntryMinutes] = useState("");
+  const [entrySeconds, setEntrySeconds] = useState("");
   const [entryDate, setEntryDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [entryNotes, setEntryNotes] = useState("");
+  const [entryIsRx, setEntryIsRx] = useState(false);
 
   // Inline edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editDate, setEditDate] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [editIsRx, setEditIsRx] = useState(false);
 
-  // Chart options
+  // Chart visibility
   const [showGraph, setShowGraph] = useState(false);
-  const [showAverage, setShowAverage] = useState(false);
 
   const loadTypes = useCallback(async () => {
     try {
-      const data = await listMetricTypes();
+      const data = await listExerciseTypes();
       setTypes(data);
       if (data.length > 0 && !selectedTypeId) {
         setSelectedTypeId(data[0]!.id);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load metric types");
+      setError(err instanceof Error ? err.message : "Failed to load exercise types");
     } finally {
       setLoading(false);
     }
@@ -60,8 +63,8 @@ export default function Metrics() {
     if (!selectedTypeId) return;
     try {
       const [entryData, trendData] = await Promise.all([
-        listMetricEntries({ metric_type_id: selectedTypeId, per_page: 50 }),
-        getMetricTrend(selectedTypeId),
+        listResultEntries({ exercise_type_id: selectedTypeId, per_page: 50 }),
+        getResultTrend(selectedTypeId),
       ]);
       setEntries(entryData.items);
       setTrend(trendData);
@@ -82,26 +85,31 @@ export default function Metrics() {
     e.preventDefault();
     setError(null);
     try {
-      const created = await createMetricType({ name: newTypeName, unit: newTypeUnit });
+      const created = await createExerciseType({
+        name: newTypeName,
+        category: newTypeCategory,
+        result_unit: newTypeUnit,
+      });
       setTypes((prev) => [...prev, created]);
       setSelectedTypeId(created.id);
       setNewTypeName("");
-      setNewTypeUnit("");
+      setNewTypeCategory("custom");
+      setNewTypeUnit("lbs");
       setShowNewType(false);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to create metric type");
+      setError(err instanceof Error ? err.message : "Failed to create exercise type");
     }
   };
 
   const handleDeleteType = async (id: string) => {
     try {
-      await deleteMetricType(id);
+      await deleteExerciseType(id);
       setTypes((prev) => prev.filter((t) => t.id !== id));
       if (selectedTypeId === id) {
         setSelectedTypeId(types.find((t) => t.id !== id)?.id ?? null);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete metric type");
+      setError(err instanceof Error ? err.message : "Failed to delete exercise type");
     }
   };
 
@@ -110,28 +118,33 @@ export default function Metrics() {
     if (!selectedTypeId) return;
     setError(null);
     try {
-      const value = isDuration
-        ? parseInt(entryHours || "0", 10) * 60 + parseInt(entryMinutes || "0", 10)
+      const value = isTime
+        ? parseInt(entryHours || "0", 10) * 3600 +
+          parseInt(entryMinutes || "0", 10) * 60 +
+          parseInt(entrySeconds || "0", 10)
         : parseFloat(entryValue);
-      await createMetricEntry({
-        metric_type_id: selectedTypeId,
+      await createResultEntry({
+        exercise_type_id: selectedTypeId,
         value,
         recorded_date: entryDate,
+        is_rx: isCrossFit ? entryIsRx : undefined,
         notes: entryNotes || undefined,
       });
       setEntryValue("");
       setEntryHours("");
       setEntryMinutes("");
+      setEntrySeconds("");
       setEntryNotes("");
+      setEntryIsRx(false);
       await loadEntries();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to log entry");
+      setError(err instanceof Error ? err.message : "Failed to log result");
     }
   };
 
   const handleDeleteEntry = async (id: string) => {
     try {
-      await deleteMetricEntry(id);
+      await deleteResultEntry(id);
       setEntries((prev) => prev.filter((e) => e.id !== id));
       await loadEntries();
     } catch (err: unknown) {
@@ -139,11 +152,12 @@ export default function Metrics() {
     }
   };
 
-  const startEditing = (entry: MetricEntry) => {
+  const startEditing = (entry: ResultEntry) => {
     setEditingId(entry.id);
     setEditValue(String(entry.value));
     setEditDate(entry.recorded_date);
     setEditNotes(entry.notes ?? "");
+    setEditIsRx(entry.is_rx);
   };
 
   const cancelEditing = () => {
@@ -153,9 +167,10 @@ export default function Metrics() {
   const handleSaveEdit = async () => {
     if (!editingId) return;
     try {
-      await updateMetricEntry(editingId, {
+      await updateResultEntry(editingId, {
         value: parseFloat(editValue),
         recorded_date: editDate,
+        is_rx: isCrossFit ? editIsRx : undefined,
         notes: editNotes || undefined,
       });
       setEditingId(null);
@@ -166,58 +181,25 @@ export default function Metrics() {
   };
 
   const selectedType = types.find((t) => t.id === selectedTypeId);
-  const isDuration = selectedType?.unit === "minutes";
+  const isTime = selectedType?.result_unit === "seconds" || selectedType?.result_unit === "time";
+  const isCrossFit = selectedType?.category === "crossfit_benchmark";
 
-  const formatDuration = (totalMinutes: number): string => {
-    const h = Math.floor(totalMinutes / 60);
-    const m = Math.round(totalMinutes % 60);
-    return `${h}h ${m}m`;
-  };
-
-  /** Compute a 7-day running average, carrying forward the last value for missing days. */
-  const computeRunningAverage = (
-    data: { recorded_date: string; value: number }[],
-  ): { dates: string[]; values: number[] } => {
-    if (data.length === 0) return { dates: [], values: [] };
-
-    // Build a day-by-day map from first to last date, carrying forward
-    const sorted = [...data].sort((a, b) => a.recorded_date.localeCompare(b.recorded_date));
-    const start = new Date(sorted[0]!.recorded_date + "T00:00:00");
-    const end = new Date(sorted[sorted.length - 1]!.recorded_date + "T00:00:00");
-
-    const valueMap = new Map<string, number>();
-    for (const pt of sorted) valueMap.set(pt.recorded_date, pt.value);
-
-    const dailyDates: string[] = [];
-    const dailyValues: number[] = [];
-    let lastValue = sorted[0]!.value;
-
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const key = d.toISOString().slice(0, 10);
-      if (valueMap.has(key)) lastValue = valueMap.get(key)!;
-      dailyDates.push(key);
-      dailyValues.push(lastValue);
-    }
-
-    // Compute rolling 7-day average
-    const avgDates: string[] = [];
-    const avgValues: number[] = [];
-    for (let i = 0; i < dailyValues.length; i++) {
-      const windowStart = Math.max(0, i - 6);
-      const window = dailyValues.slice(windowStart, i + 1);
-      const avg = window.reduce((s, v) => s + v, 0) / window.length;
-      avgDates.push(dailyDates[i]!);
-      avgValues.push(Math.round(avg * 100) / 100);
-    }
-
-    return { dates: avgDates, values: avgValues };
+  const formatTime = (totalSeconds: number): string => {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = Math.round(totalSeconds % 60);
+    const parts: string[] = [];
+    if (h > 0) parts.push(`${h}h`);
+    if (m > 0) parts.push(`${m}m`);
+    if (s > 0 || parts.length === 0) parts.push(`${s}s`);
+    return parts.join(" ");
   };
 
   if (loading) return <p className="p-6 text-light-text/60">Loading…</p>;
 
   return (
     <div className="mx-auto max-w-5xl p-6">
-      <h1 className="mb-6 text-3xl font-bold text-light-text">Metrics</h1>
+      <h1 className="mb-6 text-3xl font-bold text-light-text">Results</h1>
 
       {error && <div className="mb-4 rounded-lg bg-red-900/50 p-3 text-red-200">{error}</div>}
 
@@ -234,7 +216,7 @@ export default function Metrics() {
                     : "bg-dark-surface text-light-text hover:bg-gray-600"
                 }`}
               >
-                {t.name} ({t.unit})
+                {t.name} ({t.result_unit})
               </button>
               <button
                 onClick={() => handleDeleteType(t.id)}
@@ -259,18 +241,30 @@ export default function Metrics() {
               type="text"
               value={newTypeName}
               onChange={(e) => setNewTypeName(e.target.value)}
-              placeholder="Name (e.g. Weight)"
+              placeholder="Name (e.g. Back Squat)"
               required
               className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
             />
-            <input
-              type="text"
+            <select
+              value={newTypeCategory}
+              onChange={(e) => setNewTypeCategory(e.target.value)}
+              className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
+            >
+              <option value="olympic_lift">Olympic Lift</option>
+              <option value="power_lift">Power Lift</option>
+              <option value="crossfit_benchmark">CrossFit Benchmark</option>
+              <option value="running">Running</option>
+              <option value="custom">Custom</option>
+            </select>
+            <select
               value={newTypeUnit}
               onChange={(e) => setNewTypeUnit(e.target.value)}
-              placeholder="Unit (e.g. lbs)"
-              required
               className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
-            />
+            >
+              <option value="lbs">lbs</option>
+              <option value="seconds">seconds</option>
+              <option value="time">time</option>
+            </select>
             <button
               type="submit"
               className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
@@ -282,7 +276,7 @@ export default function Metrics() {
       </div>
 
       {!selectedType ? (
-        <p className="text-light-text/60">No metric types. Add one to get started!</p>
+        <p className="text-light-text/60">No exercise types. Add one to get started!</p>
       ) : (
         <>
           {/* Trend chart */}
@@ -311,15 +305,6 @@ export default function Metrics() {
               </button>
               {showGraph && (
                 <div className="mb-6 rounded-lg bg-dark-surface p-4">
-                  <label className="mb-2 flex items-center gap-2 text-sm text-light-text">
-                    <input
-                      type="checkbox"
-                      checked={showAverage}
-                      onChange={(e) => setShowAverage(e.target.checked)}
-                      className="rounded"
-                    />
-                    7-day average
-                  </label>
                   <Plot
                     data={[
                       {
@@ -327,26 +312,17 @@ export default function Metrics() {
                         y: trend.data.map((p) => p.value),
                         type: "scatter" as const,
                         mode: "lines+markers" as const,
-                        marker: { color: "#3B82F6" },
+                        marker: {
+                          color: trend.data.map((p) => (p.is_pr ? "#8B5CF6" : "#3B82F6")),
+                          size: trend.data.map((p) => (p.is_pr ? 12 : 6)),
+                        },
                         line: { color: "#3B82F6" },
                         name: "Value",
                       },
-                      ...(showAverage
-                        ? [
-                            {
-                              x: computeRunningAverage(trend.data).dates,
-                              y: computeRunningAverage(trend.data).values,
-                              type: "scatter" as const,
-                              mode: "lines" as const,
-                              line: { color: "#14B8A6", dash: "dash" as const, width: 2 },
-                              name: "7-day avg",
-                            },
-                          ]
-                        : []),
                     ]}
                     layout={{
                       title: {
-                        text: `${trend.metric_name} (${trend.unit})`,
+                        text: `${trend.exercise_name} (${trend.result_unit})`,
                         font: { color: "#F1F5F9" },
                       },
                       paper_bgcolor: "#1E293B",
@@ -355,7 +331,7 @@ export default function Metrics() {
                       yaxis: {
                         color: "#94A3B8",
                         gridcolor: "#334155",
-                        title: { text: trend.unit },
+                        title: { text: trend.result_unit },
                       },
                       margin: { t: 40, r: 20, b: 40, l: 60 },
                       legend: { font: { color: "#F1F5F9" } },
@@ -372,7 +348,7 @@ export default function Metrics() {
 
           {/* Log entry form */}
           <form onSubmit={handleLogEntry} className="mb-6 flex flex-wrap gap-2">
-            {isDuration ? (
+            {isTime ? (
               <>
                 <input
                   type="number"
@@ -395,6 +371,17 @@ export default function Metrics() {
                   aria-label="Minutes"
                   className="w-24 rounded-lg border border-gray-600 bg-dark-surface px-3 py-2 text-sm text-light-text focus:border-primary focus:outline-none"
                 />
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  step="1"
+                  value={entrySeconds}
+                  onChange={(e) => setEntrySeconds(e.target.value)}
+                  placeholder="Seconds"
+                  aria-label="Seconds"
+                  className="w-24 rounded-lg border border-gray-600 bg-dark-surface px-3 py-2 text-sm text-light-text focus:border-primary focus:outline-none"
+                />
               </>
             ) : (
               <input
@@ -402,7 +389,7 @@ export default function Metrics() {
                 step="any"
                 value={entryValue}
                 onChange={(e) => setEntryValue(e.target.value)}
-                placeholder={`Value (${selectedType.unit})`}
+                placeholder={`Value (${selectedType.result_unit})`}
                 required
                 aria-label="Value"
                 className="w-32 rounded-lg border border-gray-600 bg-dark-surface px-3 py-2 text-sm text-light-text focus:border-primary focus:outline-none"
@@ -426,11 +413,23 @@ export default function Metrics() {
             />
             <button
               type="submit"
-              disabled={isDuration ? !entryHours && !entryMinutes : !entryValue}
+              disabled={isTime ? !entryHours && !entryMinutes && !entrySeconds : !entryValue}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50"
             >
               Log
             </button>
+            {isCrossFit && (
+              <label className="flex items-center gap-1.5 text-sm font-medium text-light-text">
+                <input
+                  type="checkbox"
+                  checked={entryIsRx}
+                  onChange={(e) => setEntryIsRx(e.target.checked)}
+                  aria-label="RX"
+                  className="rounded"
+                />
+                RX
+              </label>
+            )}
           </form>
 
           {/* Entry list */}
@@ -441,9 +440,9 @@ export default function Metrics() {
               <thead>
                 <tr className="border-b border-gray-700">
                   <th className="pb-2 font-medium">Date</th>
-                  <th className="pb-2 font-medium">
-                    Value{isDuration ? "" : ` (${selectedType.unit})`}
-                  </th>
+                  <th className="pb-2 font-medium">Value ({selectedType.result_unit})</th>
+                  <th className="pb-2 font-medium">PR</th>
+                  {isCrossFit && <th className="pb-2 font-medium">RX</th>}
                   <th className="pb-2 font-medium">Notes</th>
                   <th className="pb-2"></th>
                 </tr>
@@ -473,6 +472,27 @@ export default function Metrics() {
                           />
                         </td>
                         <td className="py-2">
+                          {entry.is_pr && (
+                            <span className="rounded bg-purple-600 px-2 py-0.5 text-xs font-bold text-white">
+                              PR
+                            </span>
+                          )}
+                        </td>
+                        {isCrossFit && (
+                          <td className="py-2">
+                            <label className="flex items-center gap-1.5 text-sm">
+                              <input
+                                type="checkbox"
+                                checked={editIsRx}
+                                onChange={(e) => setEditIsRx(e.target.checked)}
+                                aria-label="Edit RX"
+                                className="rounded"
+                              />
+                              RX
+                            </label>
+                          </td>
+                        )}
+                        <td className="py-2">
                           <input
                             type="text"
                             value={editNotes}
@@ -499,9 +519,23 @@ export default function Metrics() {
                     ) : (
                       <>
                         <td className="py-2">{entry.recorded_date}</td>
+                        <td className="py-2">{isTime ? formatTime(entry.value) : entry.value}</td>
                         <td className="py-2">
-                          {isDuration ? formatDuration(entry.value) : entry.value}
+                          {entry.is_pr && (
+                            <span className="rounded bg-purple-600 px-2 py-0.5 text-xs font-bold text-white">
+                              PR
+                            </span>
+                          )}
                         </td>
+                        {isCrossFit && (
+                          <td className="py-2">
+                            {entry.is_rx && (
+                              <span className="rounded bg-teal-600 px-2 py-0.5 text-xs font-bold text-white">
+                                RX
+                              </span>
+                            )}
+                          </td>
+                        )}
                         <td className="py-2 text-light-text/60">{entry.notes ?? ""}</td>
                         <td className="py-2 text-right">
                           <button
