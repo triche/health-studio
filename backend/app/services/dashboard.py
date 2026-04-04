@@ -30,7 +30,12 @@ def get_summary(db: Session) -> dict:
     active_goals = []
     for goal in active_goals_raw:
         current = _compute_current_value(db, goal)
-        progress = _compute_progress(current, goal.target_value)
+        progress = _compute_progress(
+            current,
+            goal.target_value,
+            lower_is_better=goal.lower_is_better,
+            start_value=goal.start_value,
+        )
         active_goals.append(
             {
                 "id": goal.id,

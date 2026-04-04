@@ -487,3 +487,28 @@ class TestDashboardSummary:
         r = authed_client.get("/api/dashboard/summary")
         data = r.json()
         assert len(data["recent_prs"]) >= 1
+
+    def test_dashboard_goal_progress_matches_goals_page(self, authed_client):
+        """Dashboard progress must use lower_is_better and start_value like Goals page."""
+        mt = _create_metric_type(authed_client, name="Body Weight", unit="lbs")
+        # Goal: lose weight from 200 → 180 (lower_is_better with start_value)
+        goal = _create_goal(
+            authed_client,
+            target_id=mt["id"],
+            target_value=180.0,
+            start_value=200.0,
+            lower_is_better=True,
+            title="Lose Weight",
+        ).json()
+        _log_metric(authed_client, mt["id"], 190.0, "2025-01-15")
+
+        # Get progress from goals page
+        goal_resp = authed_client.get(f"/api/goals/{goal['id']}")
+        goal_progress = goal_resp.json()["progress"]
+
+        # Get progress from dashboard
+        dash_resp = authed_client.get("/api/dashboard/summary")
+        dash_goals = dash_resp.json()["active_goals"]
+        dash_progress = next(g["progress"] for g in dash_goals if g["id"] == goal["id"])
+
+        assert dash_progress == goal_progress
