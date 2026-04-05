@@ -8,13 +8,13 @@ test.describe("Metrics", () => {
     await expect(page.locator("h1")).toContainText("Metrics");
 
     // Open manage panel and create a new metric type
-    await page.getByRole("button", { name: "Manage" }).click();
+    await page.getByRole("button", { name: "Manage types" }).click();
     await page.getByPlaceholder("Name").fill("Blood Pressure");
     await page.getByPlaceholder("Unit").fill("mmHg");
     await page.getByRole("button", { name: "Create" }).click();
 
     // Close the manage panel to avoid button name conflicts
-    await page.getByRole("button", { name: "Manage" }).click();
+    await page.getByRole("button", { name: "Manage types" }).click();
 
     // Select the new metric type (label includes unit)
     await page.locator("#metric-type-select").selectOption({ label: "Blood Pressure (mmHg)" });

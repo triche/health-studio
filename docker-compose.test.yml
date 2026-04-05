@@ -1,7 +1,16 @@
-# Test overrides — sets TESTING=true for the backend
+# Test overrides — sets TESTING=true and uses alternate ports.
+# Use with a separate project name (-p health-studio-test) to isolate
+# the test stack from dev so teardown can never destroy dev data.
+#
+# NOTE: Docker Compose merges port lists, so the base ports (8000, 3000)
+# are always present. The test overlay adds alternate ports as well.
+# The separate project name prevents container/network/volume collisions,
+# but if a dev stack is running on the same host, stop it first or set
+# E2E_BACKEND_PORT / E2E_FRONTEND_PORT to free ports.
 services:
   backend:
     environment:
       - DEBUG=false
       - TESTING=true
-      - ALLOWED_ORIGINS=http://localhost:3000
+      - ALLOWED_ORIGINS=http://localhost:${E2E_FRONTEND_PORT:-3001},http://localhost:3000
+  frontend: {}

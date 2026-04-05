@@ -119,7 +119,8 @@ jobs:
 
       - name: Start Docker Compose stack
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.test.yml up -d
+          docker compose -p health-studio-test \
+            -f docker-compose.yml -f docker-compose.test.yml up -d
           echo "Waiting for backend..."
           for i in $(seq 1 60); do
             if curl -sf http://localhost:8000/api/health > /dev/null 2>&1; then
@@ -159,4 +160,4 @@ jobs:
 
       - name: Tear down Docker Compose
         if: always()
-        run: docker compose -f docker-compose.yml -f docker-compose.test.yml down -v
+        run: docker compose -p health-studio-test -f docker-compose.yml -f docker-compose.test.yml down -v
