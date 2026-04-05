@@ -6,6 +6,7 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
+      - TZ=America/Chicago
       - DEBUG=false
       - ALLOWED_ORIGINS=http://localhost:3000
     volumes:
@@ -29,6 +30,8 @@ services:
       dockerfile: ../Dockerfile.frontend
     ports:
       - "127.0.0.1:3000:3000"
+    environment:
+      - TZ=America/Chicago
     depends_on:
       backend:
         condition: service_healthy
