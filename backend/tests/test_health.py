@@ -92,3 +92,62 @@ def test_error_no_stacktrace_when_debug_off():
     body = response.json()
     assert "traceback" not in body
     assert body["detail"] == "Internal server error"
+
+
+def test_reset_endpoint_not_available_when_testing_false(client):
+    """The /api/test/reset endpoint should not exist when TESTING=false."""
+    response = client.post("/api/test/reset")
+    # Should get 401/403/404/405 — but NOT 200
+    assert response.status_code in (401, 403, 404, 405)
+
+
+def test_reset_endpoint_available_when_testing_true():
+    """The /api/test/reset endpoint works when TESTING=true."""
+    import importlib
+    import os
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+    from starlette.testclient import TestClient
+
+    # Rebuild app with TESTING=true
+    os.environ["TESTING"] = "true"
+    try:
+        import app.config as cfg
+
+        importlib.reload(cfg)
+        assert cfg.TESTING is True
+
+        import app.main as main_mod
+
+        importlib.reload(main_mod)
+        test_app = main_mod.app
+
+        from app.database import Base, get_db
+
+        engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)  # noqa: N806
+        Base.metadata.create_all(bind=engine)
+
+        def override_db():
+            db = Session()
+            try:
+                yield db
+            finally:
+                db.close()
+
+        test_app.dependency_overrides[get_db] = override_db
+
+        c = TestClient(test_app)
+        response = c.post("/api/test/reset")
+        assert response.status_code == 200
+        assert response.json() == {"status": "reset"}
+    finally:
+        os.environ["TESTING"] = "false"
+        importlib.reload(cfg)
+        importlib.reload(main_mod)

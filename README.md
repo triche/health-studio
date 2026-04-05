@@ -177,6 +177,26 @@ All endpoints are prefixed with `/api`. Authentication is required for all endpo
 |--------|------|-------------|
 | GET | `/api/dashboard/summary` | Aggregated overview |
 
+## Backup & Restore
+
+The database lives inside a Docker volume. Use the backup script to copy it to a local file:
+
+```bash
+# Create a timestamped backup
+./scripts/db-backup.sh backup
+
+# Backup to a specific file
+./scripts/db-backup.sh backup mybackup.db
+
+# List available backups
+./scripts/db-backup.sh list
+
+# Restore from a backup (stops backend, overwrites DB, restarts)
+./scripts/db-backup.sh restore backups/health_studio_20250615_120000.db
+```
+
+Backups are saved to `backups/` by default (git-ignored). **Back up regularly** — the database is the only stateful part of the app.
+
 ## Security
 
 - **Single-user application** — designed for one person, no multi-tenant support

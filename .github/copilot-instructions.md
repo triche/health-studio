@@ -1,3 +1,13 @@
+## Data Safety
+
+Before executing any command or action that may cause data loss — including but not limited to `docker compose down -v`, `docker volume rm`, `rm -rf` on data directories, database drops/resets, or any operation that could destroy Docker volumes, databases, or user-entered data — you MUST:
+
+1. **Stop** — do not execute the command.
+2. **Explain** — clearly describe what the command will do and what data is at risk.
+3. **Ask permission** — wait for explicit approval before proceeding.
+
+This applies even if the data loss is a side effect rather than the primary intent. When in doubt, assume data is at risk and ask.
+
 ## TDD Workflow
 
 Follow strict Test-Driven Development for all feature work:
