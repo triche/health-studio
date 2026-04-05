@@ -177,6 +177,15 @@ All endpoints are prefixed with `/api`. Authentication is required for all endpo
 |--------|------|-------------|
 | GET | `/api/dashboard/summary` | Aggregated overview |
 
+### Export / Import
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/export/json` | Full JSON backup |
+| GET | `/api/export/csv/{entity}` | CSV export per entity |
+| GET | `/api/export/journals/markdown` | Journals as Markdown |
+| POST | `/api/import/json` | Import JSON backup |
+| POST | `/api/import/csv/{entity}` | Import CSV (metrics/results) |
+
 ## Backup & Restore
 
 The database lives inside a Docker volume. Use the backup script to copy it to a local file:
@@ -196,6 +205,33 @@ The database lives inside a Docker volume. Use the backup script to copy it to a
 ```
 
 Backups are saved to `backups/` by default (git-ignored). **Back up regularly** — the database is the only stateful part of the app.
+
+### Export / Import
+
+Health Studio also supports application-level export and import via the API, frontend Settings page, or CLI:
+
+**Export:**
+```bash
+# Full JSON backup (all data)
+hs export json backup.json
+
+# CSV for a specific entity
+hs export csv metric_entries metrics.csv
+
+# Journal entries as Markdown
+hs export markdown journals.md
+```
+
+**Import:**
+```bash
+# Restore from JSON backup (skips existing records)
+hs import json backup.json
+
+# Bulk-import CSV data for metrics or results
+hs import csv metric_entries weight-history.csv
+```
+
+The same functionality is available in the Settings page of the web UI.
 
 ## Security
 

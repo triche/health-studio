@@ -223,6 +223,60 @@ hs journal create --title "Morning Notes" --file /tmp/entry.md --date 2026-04-04
 
 ---
 
+## `hs export` — Export Data
+
+### `hs export json <output_path>`
+Export all Health Studio data as a JSON backup file.
+
+```bash
+hs export json ~/backups/health-studio-backup.json
+```
+
+### `hs export csv <entity> <output_path>`
+Export a single entity type as CSV.
+
+**Entities:** `metric_types`, `metric_entries`, `exercise_types`, `result_entries`, `journal_entries`, `goals`
+
+```bash
+hs export csv metric_entries ~/backups/metrics.csv
+hs export csv journal_entries ~/backups/journals.csv
+```
+
+### `hs export markdown <output_path>`
+Export all journal entries as a single Markdown document.
+
+```bash
+hs export markdown ~/backups/journals.md
+```
+
+---
+
+## `hs import` — Import Data
+
+### `hs import json <input_path>`
+Import a full JSON backup. Skips records whose IDs already exist in the database.
+
+```bash
+hs import json ~/backups/health-studio-backup.json
+```
+
+**Output:** Table showing count of imported records per entity type and number skipped.
+
+### `hs import csv <entity> <input_path>`
+Import CSV data for metrics or results.
+
+**Entities:** `metric_entries`, `result_entries`
+
+**CSV columns (metric_entries):** `metric_type_id`, `value`, `recorded_date`, `notes` (optional)
+**CSV columns (result_entries):** `exercise_type_id`, `value`, `recorded_date`, `notes` (optional)
+
+```bash
+hs import csv metric_entries ~/data/weight-history.csv
+hs import csv result_entries ~/data/workout-log.csv
+```
+
+---
+
 ## Connection & Authentication
 
 - **Base URL:** Configurable, default `http://localhost:8000`

@@ -144,18 +144,20 @@ The trend endpoint returns raw data points. Server-side aggregations (weekly ave
 
 ## Data & Portability
 
-### Export / Import — High Value
+### Export / Import — High Value ✅ Implemented
 
 No way to get data out of Health Studio except direct SQLite access. This is the biggest missing capability for a personal data tool.
 
-**Export options:**
-- JSON dump of all data (full backup, machine-readable)
-- CSV per entity type (journals, metrics, results — spreadsheet-friendly)
-- Markdown export for journals (one `.md` file per entry)
+**Export options (implemented):**
+- JSON dump of all data (full backup, machine-readable) — `GET /api/export/json`
+- CSV per entity type (journals, metrics, results — spreadsheet-friendly) — `GET /api/export/csv/{entity}`
+- Markdown export for journals (one combined `.md` file) — `GET /api/export/journals/markdown`
 
-**Import options:**
-- JSON restore from backup
-- CSV import for metrics/results (bulk historical data)
+**Import options (implemented):**
+- JSON restore from backup (skips duplicates) — `POST /api/import/json`
+- CSV import for metrics/results (bulk historical data) — `POST /api/import/csv/{entity}`
+
+Available via API, frontend Settings page, and CLI (`hs export`, `hs import`).
 
 ### Automated Backups
 
