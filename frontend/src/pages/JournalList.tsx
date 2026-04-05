@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeSanitize from "rehype-sanitize";
 import { listJournals, deleteJournal } from "../api/journals";
 import type { JournalEntry } from "../types/journal";
 
@@ -8,6 +11,7 @@ export default function JournalList() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
   const [searchParams, setSearchParams] = useSearchParams();
 
   const page = Number(searchParams.get("page") ?? "1");
@@ -61,24 +65,54 @@ export default function JournalList() {
         <>
           <ul className="space-y-3">
             {entries.map((entry) => (
-              <li
-                key={entry.id}
-                className="flex items-center justify-between rounded-lg bg-dark-surface p-4"
-              >
-                <Link
-                  to={`/journals/${entry.id}`}
-                  className="min-w-0 flex-1 text-light-text hover:text-primary"
-                >
-                  <h2 className="truncate text-lg font-semibold">{entry.title}</h2>
-                  <p className="text-sm text-light-text/60">{entry.entry_date}</p>
-                </Link>
-                <button
-                  onClick={() => handleDelete(entry.id)}
-                  className="ml-4 text-sm text-red-400 hover:text-red-300"
-                  aria-label={`Delete ${entry.title}`}
-                >
-                  Delete
-                </button>
+              <li key={entry.id} className="rounded-lg bg-dark-surface p-4">
+                <div className="flex items-center justify-between">
+                  <Link
+                    to={`/journals/${entry.id}`}
+                    className="min-w-0 flex-1 text-light-text hover:text-primary"
+                  >
+                    <h2 className="truncate text-lg font-semibold">{entry.title}</h2>
+                    <p className="text-sm text-light-text/60">{entry.entry_date}</p>
+                  </Link>
+                  <div className="ml-4 flex items-center gap-3">
+                    <button
+                      onClick={() =>
+                        setExpandedEntries((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(entry.id)) next.delete(entry.id);
+                          else next.add(entry.id);
+                          return next;
+                        })
+                      }
+                      className="flex items-center gap-1 text-xs text-light-text/50 hover:text-light-text/70"
+                      aria-expanded={expandedEntries.has(entry.id)}
+                      aria-label="Toggle content"
+                    >
+                      <span
+                        className={`inline-block transition-transform ${
+                          expandedEntries.has(entry.id) ? "rotate-90" : ""
+                        }`}
+                      >
+                        ▶
+                      </span>
+                      Content
+                    </button>
+                    <button
+                      onClick={() => handleDelete(entry.id)}
+                      className="text-sm text-red-400 hover:text-red-300"
+                      aria-label={`Delete ${entry.title}`}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+                {expandedEntries.has(entry.id) && (
+                  <div className="prose prose-sm prose-invert mt-3 max-w-none rounded-lg bg-dark-bg p-3">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                      {entry.content}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

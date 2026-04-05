@@ -108,6 +108,98 @@ describe("JournalList", () => {
     expect(await screen.findByText("New Entry")).toBeInTheDocument();
     expect(screen.getByText("New Entry").closest("a")).toHaveAttribute("href", "/journals/new");
   });
+
+  it("expands and collapses rendered markdown content", async () => {
+    const user = userEvent.setup();
+    mockListJournals.mockResolvedValue({
+      items: [
+        {
+          id: "1",
+          title: "Markdown Entry",
+          content: "## Hello\n\nSome **bold** text",
+          entry_date: "2025-01-15",
+          created_at: "2025-01-15T00:00:00",
+          updated_at: "2025-01-15T00:00:00",
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 20,
+    });
+
+    render(
+      <MemoryRouter>
+        <JournalList />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Markdown Entry")).toBeInTheDocument();
+
+    // Content should not be visible initially
+    expect(screen.queryByText("Hello")).not.toBeInTheDocument();
+
+    // Click toggle to expand
+    const toggle = screen.getByLabelText("Toggle content");
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await user.click(toggle);
+
+    // Rendered markdown content should now be visible
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Hello")).toBeInTheDocument();
+
+    // Click again to collapse
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Hello")).not.toBeInTheDocument();
+  });
+
+  it("can expand multiple journal entries independently", async () => {
+    const user = userEvent.setup();
+    mockListJournals.mockResolvedValue({
+      items: [
+        {
+          id: "1",
+          title: "First",
+          content: "Content one",
+          entry_date: "2025-01-15",
+          created_at: "2025-01-15T00:00:00",
+          updated_at: "2025-01-15T00:00:00",
+        },
+        {
+          id: "2",
+          title: "Second",
+          content: "Content two",
+          entry_date: "2025-01-16",
+          created_at: "2025-01-16T00:00:00",
+          updated_at: "2025-01-16T00:00:00",
+        },
+      ],
+      total: 2,
+      page: 1,
+      per_page: 20,
+    });
+
+    render(
+      <MemoryRouter>
+        <JournalList />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("First")).toBeInTheDocument();
+
+    const toggles = screen.getAllByLabelText("Toggle content");
+    expect(toggles).toHaveLength(2);
+
+    // Expand only the first entry
+    await user.click(toggles[0]!);
+    expect(screen.getByText("Content one")).toBeInTheDocument();
+    expect(screen.queryByText("Content two")).not.toBeInTheDocument();
+
+    // Expand the second entry as well
+    await user.click(toggles[1]!);
+    expect(screen.getByText("Content one")).toBeInTheDocument();
+    expect(screen.getByText("Content two")).toBeInTheDocument();
+  });
 });
 
 describe("JournalEdit", () => {
