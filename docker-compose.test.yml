@@ -1,0 +1,7 @@
+# Test overrides — sets TESTING=true for the backend
+services:
+  backend:
+    environment:
+      - DEBUG=false
+      - TESTING=true
+      - ALLOWED_ORIGINS=http://localhost:3000

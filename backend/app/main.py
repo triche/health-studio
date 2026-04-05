@@ -3,11 +3,11 @@ from __future__ import annotations
 import contextlib
 import traceback
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.config import ALLOWED_ORIGINS, DEBUG, MAX_BODY_SIZE
+from app.config import ALLOWED_ORIGINS, DEBUG, MAX_BODY_SIZE, TESTING
 from app.database import get_db
 from app.routers import goals, journals, metrics, results
 from app.routers.auth import keys_router
@@ -138,3 +138,32 @@ async def generic_exception_handler(request: Request, exc: Exception):
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Test-only reset endpoint — wipes all data for E2E isolation
+# ---------------------------------------------------------------------------
+if TESTING:
+    from app.models import (  # noqa: E402
+        ApiKey,
+        Goal,
+        JournalEntry,
+        MetricEntry,
+        ResultEntry,
+        User,
+    )
+    from app.seed import seed  # noqa: E402
+
+    _PUBLIC_PATHS = _PUBLIC_PATHS | {"/api/test/reset"}
+
+    @app.post("/api/test/reset")
+    def test_reset(db=Depends(get_db)):  # noqa: B008
+        """Clear all data and re-seed. Only available when TESTING=true."""
+        for model in [Goal, ResultEntry, MetricEntry, JournalEntry, ApiKey, User]:
+            db.query(model).delete()
+        db.commit()
+        auth_service.clear_sessions()
+        auth_service.clear_challenges()
+        auth_service.clear_rate_limits()
+        seed(db)
+        return {"status": "reset"}

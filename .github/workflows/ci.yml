@@ -98,3 +98,65 @@ jobs:
 
       - name: Build Docker images
         run: docker compose build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [docker]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install E2E dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: e2e
+        run: npx playwright install chromium --with-deps
+
+      - name: Start Docker Compose stack
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.test.yml up -d
+          echo "Waiting for backend..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8000/api/health > /dev/null 2>&1; then
+              echo "Backend is healthy"
+              break
+            fi
+            sleep 1
+          done
+          echo "Waiting for frontend..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              echo "Frontend is ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run Playwright E2E tests
+        working-directory: e2e
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 14
+
+      - name: Upload test traces
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: e2e/test-results/
+          retention-days: 14
+
+      - name: Tear down Docker Compose
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.test.yml down -v
