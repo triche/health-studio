@@ -6,6 +6,7 @@ import typer
 
 from health_studio_cli.api import get_client
 from health_studio_cli.display import console, print_error, print_markdown, print_table
+from health_studio_cli.resolve import resolve_id
 
 app = typer.Typer(help="Track goals and progress.")
 
@@ -71,6 +72,8 @@ def list_goals(
 def show(goal_id: str = typer.Argument(..., help="Goal ID")) -> None:
     """Show goal detail with progress."""
     with get_client() as client:
+        goal_id = resolve_id(client, goal_id, "/api/goals")
+
         try:
             response = client.get(f"/api/goals/{goal_id}")
             response.raise_for_status()

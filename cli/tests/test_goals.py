@@ -6,6 +6,8 @@ from typer.testing import CliRunner
 
 runner = CliRunner()
 
+_G1 = "g1000000-0000-0000-0000-000000000001"
+
 
 class TestGoalsList:
     """Test hs goals list command."""
@@ -82,7 +84,7 @@ class TestGoalsShow:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "id": "g1",
+            "id": _G1,
             "title": "Squat 300lbs",
             "description": "Get stronger",
             "plan": "## Training Plan\n- Back squat 3x5 MWF",
@@ -106,9 +108,9 @@ class TestGoalsShow:
             mock_get_client.return_value.__enter__ = MagicMock(return_value=client)
             mock_get_client.return_value.__exit__ = MagicMock(return_value=False)
 
-            result = runner.invoke(app, ["goals", "show", "g1"])
+            result = runner.invoke(app, ["goals", "show", _G1])
 
             assert result.exit_code == 0
             call_url = client.get.call_args[0][0]
-            assert "/api/goals/g1" in call_url
+            assert f"/api/goals/{_G1}" in call_url
             assert "Squat 300lbs" in result.output

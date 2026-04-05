@@ -6,6 +6,8 @@ from typer.testing import CliRunner
 
 runner = CliRunner()
 
+_MT1 = "mt100000-0000-0000-0000-000000000001"
+
 
 class TestMetricsTypes:
     """Test hs metrics types command."""
@@ -63,7 +65,7 @@ class TestMetricsLog:
         mock_response.status_code = 201
         mock_response.json.return_value = {
             "id": "me1",
-            "metric_type_id": "mt1",
+            "metric_type_id": _MT1,
             "value": 185.0,
             "recorded_date": "2024-01-15",
             "notes": None,
@@ -77,7 +79,7 @@ class TestMetricsLog:
             mock_get_client.return_value.__enter__ = MagicMock(return_value=client)
             mock_get_client.return_value.__exit__ = MagicMock(return_value=False)
 
-            result = runner.invoke(app, ["metrics", "log", "mt1", "185.0"])
+            result = runner.invoke(app, ["metrics", "log", _MT1, "185.0"])
 
             assert result.exit_code == 0
             client.post.assert_called_once()
@@ -85,7 +87,7 @@ class TestMetricsLog:
             call_url = call_args[0][0]
             assert "/api/metrics" in call_url
             body = call_args[1].get("json", {})
-            assert body["metric_type_id"] == "mt1"
+            assert body["metric_type_id"] == _MT1
             assert body["value"] == 185.0
 
     def test_metrics_log_with_date_and_notes(self):
@@ -96,7 +98,7 @@ class TestMetricsLog:
         mock_response.status_code = 201
         mock_response.json.return_value = {
             "id": "me1",
-            "metric_type_id": "mt1",
+            "metric_type_id": _MT1,
             "value": 185.0,
             "recorded_date": "2024-01-10",
             "notes": "Morning weight",
@@ -115,7 +117,7 @@ class TestMetricsLog:
                 [
                     "metrics",
                     "log",
-                    "mt1",
+                    _MT1,
                     "185.0",
                     "--date",
                     "2024-01-10",
@@ -140,7 +142,7 @@ class TestMetricsTrend:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "metric_type_id": "mt1",
+            "metric_type_id": _MT1,
             "metric_name": "Weight",
             "unit": "lbs",
             "data": [
@@ -157,8 +159,8 @@ class TestMetricsTrend:
             mock_get_client.return_value.__enter__ = MagicMock(return_value=client)
             mock_get_client.return_value.__exit__ = MagicMock(return_value=False)
 
-            result = runner.invoke(app, ["metrics", "trend", "mt1"])
+            result = runner.invoke(app, ["metrics", "trend", _MT1])
 
             assert result.exit_code == 0
             call_url = client.get.call_args[0][0]
-            assert "/api/metrics/trends/mt1" in call_url
+            assert f"/api/metrics/trends/{_MT1}" in call_url

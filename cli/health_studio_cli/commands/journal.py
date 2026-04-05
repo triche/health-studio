@@ -15,6 +15,7 @@ from health_studio_cli.display import (
     print_success,
     print_table,
 )
+from health_studio_cli.resolve import resolve_id
 
 app = typer.Typer(help="Manage journal entries.")
 
@@ -78,6 +79,8 @@ def list_entries(
 def show(journal_id: str = typer.Argument(..., help="Journal entry ID")) -> None:
     """Show a single journal entry with Markdown rendering."""
     with get_client() as client:
+        journal_id = resolve_id(client, journal_id, "/api/journals")
+
         try:
             response = client.get(f"/api/journals/{journal_id}")
             response.raise_for_status()

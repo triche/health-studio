@@ -8,6 +8,7 @@ import typer
 
 from health_studio_cli.api import get_client
 from health_studio_cli.display import console, print_error, print_success, print_table
+from health_studio_cli.resolve import resolve_id
 
 app = typer.Typer(help="Track health metrics.")
 
@@ -59,15 +60,17 @@ def log(
     if not log_date:
         log_date = date.today().isoformat()
 
-    body: dict = {
-        "metric_type_id": type_id,
-        "value": value,
-        "recorded_date": log_date,
-    }
-    if notes:
-        body["notes"] = notes
-
     with get_client() as client:
+        type_id = resolve_id(client, type_id, "/api/metric-types")
+
+        body: dict = {
+            "metric_type_id": type_id,
+            "value": value,
+            "recorded_date": log_date,
+        }
+        if notes:
+            body["notes"] = notes
+
         try:
             response = client.post("/api/metrics", json=body)
             response.raise_for_status()
@@ -85,6 +88,8 @@ def trend(
 ) -> None:
     """Show trend data for a metric type."""
     with get_client() as client:
+        type_id = resolve_id(client, type_id, "/api/metric-types")
+
         params: dict = {}
         if since:
             params["date_from"] = since

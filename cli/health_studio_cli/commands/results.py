@@ -8,6 +8,7 @@ import typer
 
 from health_studio_cli.api import get_client
 from health_studio_cli.display import console, print_error, print_success, print_table
+from health_studio_cli.resolve import resolve_id
 
 app = typer.Typer(help="Track exercise results and PRs.")
 
@@ -59,15 +60,17 @@ def log(
     if not log_date:
         log_date = date.today().isoformat()
 
-    body: dict = {
-        "exercise_type_id": exercise_id,
-        "value": value,
-        "recorded_date": log_date,
-    }
-    if notes:
-        body["notes"] = notes
-
     with get_client() as client:
+        exercise_id = resolve_id(client, exercise_id, "/api/exercise-types")
+
+        body: dict = {
+            "exercise_type_id": exercise_id,
+            "value": value,
+            "recorded_date": log_date,
+        }
+        if notes:
+            body["notes"] = notes
+
         try:
             response = client.post("/api/results", json=body)
             response.raise_for_status()
@@ -85,6 +88,8 @@ def prs(
 ) -> None:
     """Show PR history for an exercise."""
     with get_client() as client:
+        exercise_id = resolve_id(client, exercise_id, "/api/exercise-types")
+
         try:
             response = client.get(f"/api/results/prs/{exercise_id}")
             response.raise_for_status()
