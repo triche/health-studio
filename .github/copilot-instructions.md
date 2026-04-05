@@ -30,6 +30,12 @@ After any significant change (new features, refactors, dependency updates, confi
 
 Fix any failures before moving on.
 
+## Health Data Questions & Analysis
+
+When the user asks questions about their health data, wants analysis or insights, or asks you to interact with their Health Studio application data, **always** read the skill file at `.github/skills/health-studio-cli/SKILL.md` and use the `hs` CLI to query the running application. Do not guess or fabricate data — use the CLI commands to retrieve real data, then analyze and respond based on actual results.
+
+This applies to any question about: metrics, goals, exercise results, personal records, trends, journal entries, progress, dashboard summaries, or any request for health-related insights and analysis.
+
 ## Implementation Plan
 
 When implementing phases from `docs/plans/health-studio-implementation-plan.md`, always run the full CI pipeline after completing each phase. Do not consider a phase done until all CI stages pass.
