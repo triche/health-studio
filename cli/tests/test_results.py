@@ -6,6 +6,8 @@ from typer.testing import CliRunner
 
 runner = CliRunner()
 
+_ET1 = "et100000-0000-0000-0000-000000000001"
+
 
 class TestResultsTypes:
     """Test hs results types command."""
@@ -63,7 +65,7 @@ class TestResultsLog:
         mock_response.status_code = 201
         mock_response.json.return_value = {
             "id": "re1",
-            "exercise_type_id": "et1",
+            "exercise_type_id": _ET1,
             "value": 275.0,
             "display_value": None,
             "recorded_date": "2024-01-15",
@@ -80,14 +82,14 @@ class TestResultsLog:
             mock_get_client.return_value.__enter__ = MagicMock(return_value=client)
             mock_get_client.return_value.__exit__ = MagicMock(return_value=False)
 
-            result = runner.invoke(app, ["results", "log", "et1", "275.0"])
+            result = runner.invoke(app, ["results", "log", _ET1, "275.0"])
 
             assert result.exit_code == 0
             client.post.assert_called_once()
             call_url = client.post.call_args[0][0]
             assert "/api/results" in call_url
             body = client.post.call_args[1].get("json", {})
-            assert body["exercise_type_id"] == "et1"
+            assert body["exercise_type_id"] == _ET1
             assert body["value"] == 275.0
 
     def test_results_log_with_date_and_notes(self):
@@ -98,7 +100,7 @@ class TestResultsLog:
         mock_response.status_code = 201
         mock_response.json.return_value = {
             "id": "re1",
-            "exercise_type_id": "et1",
+            "exercise_type_id": _ET1,
             "value": 275.0,
             "display_value": None,
             "recorded_date": "2024-01-10",
@@ -120,7 +122,7 @@ class TestResultsLog:
                 [
                     "results",
                     "log",
-                    "et1",
+                    _ET1,
                     "275.0",
                     "--date",
                     "2024-01-10",
@@ -147,7 +149,7 @@ class TestResultsPRs:
         mock_response.json.return_value = [
             {
                 "id": "re1",
-                "exercise_type_id": "et1",
+                "exercise_type_id": _ET1,
                 "value": 275.0,
                 "display_value": None,
                 "recorded_date": "2024-01-15",
@@ -165,8 +167,8 @@ class TestResultsPRs:
             mock_get_client.return_value.__enter__ = MagicMock(return_value=client)
             mock_get_client.return_value.__exit__ = MagicMock(return_value=False)
 
-            result = runner.invoke(app, ["results", "prs", "et1"])
+            result = runner.invoke(app, ["results", "prs", _ET1])
 
             assert result.exit_code == 0
             call_url = client.get.call_args[0][0]
-            assert "/api/results/prs/et1" in call_url
+            assert f"/api/results/prs/{_ET1}" in call_url

@@ -7,6 +7,9 @@ from typer.testing import CliRunner
 
 runner = CliRunner()
 
+_J1 = "j1000000-0000-0000-0000-000000000001"
+_NONEXISTENT = "00000000-0000-0000-0000-nonexistent0"
+
 
 class TestJournalList:
     """Test hs journal list command."""
@@ -111,7 +114,7 @@ class TestJournalShow:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "id": "j1",
+            "id": _J1,
             "title": "Morning Thoughts",
             "content": "# Hello\nSome content",
             "entry_date": "2024-01-15",
@@ -126,11 +129,11 @@ class TestJournalShow:
             mock_get_client.return_value.__enter__ = MagicMock(return_value=client)
             mock_get_client.return_value.__exit__ = MagicMock(return_value=False)
 
-            result = runner.invoke(app, ["journal", "show", "j1"])
+            result = runner.invoke(app, ["journal", "show", _J1])
 
             assert result.exit_code == 0
             call_url = client.get.call_args[0][0]
-            assert "/api/journals/j1" in call_url
+            assert f"/api/journals/{_J1}" in call_url
 
 
 class TestJournalCreate:
@@ -194,7 +197,7 @@ class TestJournalErrorHandling:
             mock_get_client.return_value.__enter__ = MagicMock(return_value=client)
             mock_get_client.return_value.__exit__ = MagicMock(return_value=False)
 
-            result = runner.invoke(app, ["journal", "show", "nonexistent"])
+            result = runner.invoke(app, ["journal", "show", _NONEXISTENT])
 
             assert result.exit_code == 1
             assert "not found" in result.output.lower() or "error" in result.output.lower()
