@@ -7,6 +7,9 @@ from app.config import DATABASE_URL
 from app.database import Base
 from app.models import (  # noqa: F401 — ensure all models are registered
     ApiKey,
+    AuthChallenge,
+    AuthRateLimit,
+    AuthSession,
     ExerciseType,
     Goal,
     JournalEntry,

@@ -16,6 +16,9 @@ from app.database import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import (  # noqa: E402, F401 — register all models
     ApiKey,
+    AuthChallenge,
+    AuthRateLimit,
+    AuthSession,
     ExerciseType,
     Goal,
     JournalEntry,
@@ -24,7 +27,6 @@ from app.models import (  # noqa: E402, F401 — register all models
     ResultEntry,
     User,
 )
-from app.services import auth as auth_service  # noqa: E402
 
 TEST_ENGINE = create_engine(
     "sqlite:///:memory:",
@@ -36,13 +38,10 @@ TestSessionLocal = sessionmaker(bind=TEST_ENGINE, autocommit=False, autoflush=Fa
 
 @pytest.fixture(autouse=True)
 def _setup_db():
-    """Create and drop all tables around every test; clear auth state."""
+    """Create and drop all tables around every test."""
     Base.metadata.create_all(bind=TEST_ENGINE)
     yield
     Base.metadata.drop_all(bind=TEST_ENGINE)
-    auth_service.clear_sessions()
-    auth_service.clear_challenges()
-    auth_service.clear_rate_limits()
 
 
 def _override_get_db():

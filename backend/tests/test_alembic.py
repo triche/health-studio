@@ -35,6 +35,9 @@ def test_alembic_migration_applies_cleanly():
             "exercise_types",
             "result_entries",
             "goals",
+            "auth_sessions",
+            "auth_challenges",
+            "auth_rate_limits",
             "alembic_version",
         }
         assert expected.issubset(tables), f"Missing tables: {expected - tables}"

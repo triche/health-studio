@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from app.models.auth_state import AuthChallenge, AuthRateLimit, AuthSession
 from app.models.user import User
 
 
@@ -322,3 +323,75 @@ class TestWebAuthnWrappers:
             _, kwargs = mock_verify.call_args
             assert isinstance(kwargs["expected_challenge"], bytes)
             assert kwargs["expected_challenge"] == challenge
+
+
+# ---------------------------------------------------------------------------
+# SQLite-backed auth state persistence
+# ---------------------------------------------------------------------------
+class TestSessionPersistence:
+    def test_session_stored_in_database(self, db):
+        """Sessions are backed by the database, not in-memory dicts."""
+        from app.services import auth as auth_service
+
+        token = auth_service.create_session(db)
+        row = db.query(AuthSession).filter_by(token=token).first()
+        assert row is not None
+        assert row.created_at > 0
+        assert row.last_seen > 0
+
+    def test_session_validates_from_database(self, db):
+        """validate_session reads from the database."""
+        from app.services import auth as auth_service
+
+        token = auth_service.create_session(db)
+        assert auth_service.validate_session(db, token) is True
+
+    def test_delete_session_removes_from_database(self, db):
+        """delete_session removes the row from the database."""
+        from app.services import auth as auth_service
+
+        token = auth_service.create_session(db)
+        auth_service.delete_session(db, token)
+        row = db.query(AuthSession).filter_by(token=token).first()
+        assert row is None
+
+    def test_clear_sessions_empties_table(self, db):
+        """clear_sessions deletes all session rows."""
+        from app.services import auth as auth_service
+
+        auth_service.create_session(db)
+        auth_service.create_session(db)
+        auth_service.clear_sessions(db)
+        assert db.query(AuthSession).count() == 0
+
+
+class TestChallengePersistence:
+    def test_challenge_stored_in_database(self, db):
+        """Challenges are stored in the database."""
+        from app.services import auth as auth_service
+
+        challenge = b"\x01\x02\x03"
+        auth_service._store_challenge(db, challenge, display_name="Test")
+        row = db.query(AuthChallenge).first()
+        assert row is not None
+        assert row.challenge == challenge
+        assert row.display_name == "Test"
+
+
+class TestRateLimitPersistence:
+    def test_failed_attempt_stored_in_database(self, db):
+        """Rate limit entries are stored in the database."""
+        from app.services import auth as auth_service
+
+        auth_service.record_failed_attempt(db, "192.168.1.1")
+        rows = db.query(AuthRateLimit).filter_by(ip="192.168.1.1").all()
+        assert len(rows) == 1
+
+    def test_rate_limit_enforced_from_database(self, db):
+        """check_rate_limit reads from the database."""
+        from app.services import auth as auth_service
+
+        for _ in range(5):
+            auth_service.record_failed_attempt(db, "10.0.0.1")
+        with pytest.raises(Exception, match="Too many failed attempts"):
+            auth_service.check_rate_limit(db, "10.0.0.1")
