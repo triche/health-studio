@@ -43,8 +43,13 @@ vi.mock("react-plotly.js", () => ({
   default: () => <div data-testid="plotly-chart" />,
 }));
 
+declare const process: { env: Record<string, string | undefined> };
+const originalTZ = process.env.TZ;
+
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.useRealTimers();
+  process.env.TZ = originalTZ;
 });
 
 describe("Date defaults use local time, not UTC", () => {
@@ -55,11 +60,11 @@ describe("Date defaults use local time, not UTC", () => {
   const UTC_DATE = "2026-04-06";
 
   function mockLateNightCentral() {
+    // Set timezone to Central so getDate()/getMonth()/getFullYear() use CDT
+    process.env.TZ = "America/Chicago";
     // April 6, 2026 04:00:00 UTC = April 5, 2026 11:00:00 PM CDT
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-04-06T04:00:00Z"));
-    // Override getTimezoneOffset to simulate CDT (UTC-5)
-    vi.spyOn(Date.prototype, "getTimezoneOffset").mockReturnValue(300);
 
     // Provide a type so the entry form (with date input) renders
     mockListMetricTypes.mockResolvedValue([
@@ -103,7 +108,6 @@ describe("Date defaults use local time, not UTC", () => {
       expect(screen.getByDisplayValue(LOCAL_DATE)).toBeInTheDocument();
     });
     expect(screen.queryByDisplayValue(UTC_DATE)).toBeNull();
-    vi.useRealTimers();
   });
 
   it("Results page defaults date to local date, not UTC", async () => {
@@ -118,7 +122,6 @@ describe("Date defaults use local time, not UTC", () => {
       expect(screen.getByDisplayValue(LOCAL_DATE)).toBeInTheDocument();
     });
     expect(screen.queryByDisplayValue(UTC_DATE)).toBeNull();
-    vi.useRealTimers();
   });
 
   it("JournalEdit page defaults date to local date, not UTC", async () => {
@@ -132,6 +135,5 @@ describe("Date defaults use local time, not UTC", () => {
     const dateInput = screen.getByDisplayValue(LOCAL_DATE);
     expect(dateInput).toBeInTheDocument();
     expect(screen.queryByDisplayValue(UTC_DATE)).toBeNull();
-    vi.useRealTimers();
   });
 });

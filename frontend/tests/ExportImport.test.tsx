@@ -32,8 +32,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockListApiKeys.mockResolvedValue([]);
   // Mock URL.createObjectURL and URL.revokeObjectURL
-  global.URL.createObjectURL = vi.fn(() => "blob:http://localhost/fake");
-  global.URL.revokeObjectURL = vi.fn();
+  globalThis.URL.createObjectURL = vi.fn(() => "blob:http://localhost/fake") as typeof URL.createObjectURL;
+  globalThis.URL.revokeObjectURL = vi.fn() as unknown as typeof URL.revokeObjectURL;
 });
 
 describe("Settings — Export / Import", () => {
