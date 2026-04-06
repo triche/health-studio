@@ -42,11 +42,44 @@ vi.mock("../src/api/results", () => ({
 }));
 
 // Mock react-md-editor to avoid complex rendering in tests
-vi.mock("@uiw/react-md-editor", () => ({
-  default: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <textarea data-testid="md-editor" value={value} onChange={(e) => onChange(e.target.value)} />
-  ),
-}));
+vi.mock("@uiw/react-md-editor", () => {
+  const commands = {
+    bold: { name: "bold" },
+    italic: { name: "italic" },
+    strikethrough: { name: "strikethrough" },
+    title1: { name: "title1" },
+    title2: { name: "title2" },
+    title3: { name: "title3" },
+    title4: { name: "title4" },
+    quote: { name: "quote" },
+    unorderedListCommand: { name: "unordered-list" },
+    orderedListCommand: { name: "ordered-list" },
+    checkedListCommand: { name: "checked-list" },
+    link: { name: "link" },
+    image: { name: "image" },
+    hr: { name: "hr" },
+    divider: { name: "divider" },
+    group: () => ({ name: "group" }),
+  };
+  return {
+    default: ({
+      value,
+      onChange,
+      "data-testid": testId,
+    }: {
+      value: string;
+      onChange: (v: string) => void;
+      "data-testid"?: string;
+    }) => (
+      <textarea
+        data-testid={testId || "md-editor"}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    ),
+    commands,
+  };
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

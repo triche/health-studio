@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeSanitize from "rehype-sanitize";
 import { getJournal, createJournal, updateJournal } from "../api/journals";
 import type { JournalEntry } from "../types/journal";
+import MarkdownEditor from "../components/MarkdownEditor";
 
 export default function JournalEdit() {
   const { id } = useParams<{ id: string }>();
@@ -17,7 +15,6 @@ export default function JournalEdit() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
-  const [preview, setPreview] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
   const [error, setError] = useState<string | null>(null);
@@ -100,34 +97,10 @@ export default function JournalEdit() {
         </div>
 
         <div>
-          <div className="mb-1 flex items-center justify-between">
-            <label htmlFor="content" className="text-sm font-medium text-light-text">
-              Content (Markdown)
-            </label>
-            <button
-              type="button"
-              onClick={() => setPreview((p) => !p)}
-              className="text-sm text-primary hover:text-blue-400"
-            >
-              {preview ? "Edit" : "Preview"}
-            </button>
-          </div>
-
-          {preview ? (
-            <div className="prose prose-invert min-h-[200px] max-w-none rounded-lg border border-gray-600 bg-dark-surface p-3">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-                {content}
-              </ReactMarkdown>
-            </div>
-          ) : (
-            <textarea
-              id="content"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={12}
-              className="w-full rounded-lg border border-gray-600 bg-dark-surface px-3 py-2 font-mono text-sm text-light-text focus:border-primary focus:outline-none"
-            />
-          )}
+          <label className="mb-1 block text-sm font-medium text-light-text">
+            Content (Markdown)
+          </label>
+          <MarkdownEditor value={content} onChange={setContent} height={300} />
         </div>
 
         <div className="flex gap-3">

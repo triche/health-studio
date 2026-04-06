@@ -59,20 +59,13 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 Even for local use, `X-Frame-Options: DENY` prevents clickjacking if the port is accidentally exposed.
 
-### In-Memory Auth State
+### In-Memory Auth State ✅ Implemented
 
-Sessions, challenges, and rate limits all live in Python dicts. A process restart wipes all sessions (every user gets logged out) and resets rate limits. This is fine for single-process `uvicorn`, but:
+Sessions, challenges, and rate limits are now persisted in SQLite via three new models (`AuthSession`, `AuthChallenge`, `AuthRateLimit`) with an Alembic migration. Process restarts no longer wipe sessions or reset rate limits. Multi-worker sharing would still require Redis.
 
-- **If you ever run multiple workers**, sessions won't be shared
-- **Restarts during updates** force re-login
+### Dev Dependencies in Production Docker Image ✅ Implemented
 
-**Options:** SQLite-backed sessions (simplest), or Redis if you ever scale beyond one process.
-
-### Dev Dependencies in Production Docker Image
-
-`Dockerfile.backend` installs `.[dev]` which pulls pytest, ruff, httpx, and pip-audit into the production image. These add attack surface and image size for no benefit.
-
-**Fix:** Change to `pip install .` (no extras) in the Dockerfile, or use a multi-stage build like the frontend does.
+`Dockerfile.backend` now installs only production dependencies (`pip install .` without `.[dev]`), removing pytest, ruff, httpx, and pip-audit from the production image.
 
 ### SQLite Encryption at Rest
 
@@ -82,9 +75,9 @@ The database file is plain-text on disk. If the host is compromised, all health 
 
 ## Frontend Quality of Life
 
-### Markdown Editor Toolbar
+### Markdown Editor Toolbar ✅ Implemented
 
-Journal and goal plan editors are raw Markdown textareas. A formatting toolbar (bold, italic, heading, list, link buttons) would lower the bar for quick entries. `@uiw/react-md-editor` already supports this — it just needs to be wired up with a toolbar config.
+Journal and goal plan editors now use a reusable `MarkdownEditor` component wrapping `@uiw/react-md-editor` with a toolbar providing bold, italic, strikethrough, headings (H1–H4 dropdown), quote, lists (unordered, ordered, checklist), link, image, and horizontal rule. Auto-syncs dark/light mode.
 
 ### Keyboard Shortcuts
 
