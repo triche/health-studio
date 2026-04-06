@@ -6,7 +6,9 @@ import typer
 
 from health_studio_cli.commands.config_cmd import app as config_app
 from health_studio_cli.commands.dashboard import app as dashboard_app
+from health_studio_cli.commands.export_cmd import app as export_app
 from health_studio_cli.commands.goals import app as goals_app
+from health_studio_cli.commands.import_cmd import app as import_app
 from health_studio_cli.commands.journal import app as journal_app
 from health_studio_cli.commands.metrics import app as metrics_app
 from health_studio_cli.commands.results import app as results_app
@@ -27,6 +29,8 @@ app.add_typer(results_app, name="results")
 app.add_typer(goals_app, name="goals")
 app.add_typer(config_app, name="config")
 app.add_typer(dashboard_app, name="dashboard")
+app.add_typer(export_app, name="export")
+app.add_typer(import_app, name="import")
 
 
 def _version_callback(value: bool) -> None:

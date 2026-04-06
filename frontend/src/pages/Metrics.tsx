@@ -29,7 +29,10 @@ export default function Metrics() {
   const [entryValue, setEntryValue] = useState("");
   const [entryHours, setEntryHours] = useState("");
   const [entryMinutes, setEntryMinutes] = useState("");
-  const [entryDate, setEntryDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [entryDate, setEntryDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [entryNotes, setEntryNotes] = useState("");
 
   // Inline edit state

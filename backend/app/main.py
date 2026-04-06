@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import ALLOWED_ORIGINS, DEBUG, MAX_BODY_SIZE, TESTING
 from app.database import get_db
-from app.routers import goals, journals, metrics, results
+from app.routers import export_import, goals, journals, metrics, results
 from app.routers.auth import keys_router
 from app.routers.auth import router as auth_router
 from app.services import auth as auth_service
@@ -21,6 +21,7 @@ app.include_router(journals.router)
 app.include_router(metrics.router)
 app.include_router(results.router)
 app.include_router(goals.router)
+app.include_router(export_import.router)
 
 # ---------------------------------------------------------------------------
 # CORS
@@ -88,26 +89,26 @@ async def auth_middleware(request: Request, call_next):
             content={"detail": "Missing X-Requested-With header"},
         )
 
-    # Check session cookie
-    session_token = request.cookies.get("session")
-    if auth_service.validate_session(session_token):
-        return await call_next(request)
+    # Get DB session for auth checks (session validation + API key validation)
+    db_factory = request.app.dependency_overrides.get(get_db, get_db)
+    db_gen = db_factory()
+    db = next(db_gen)
+    try:
+        # Check session cookie
+        session_token = request.cookies.get("session")
+        if auth_service.validate_session(db, session_token):
+            return await call_next(request)
 
-    # Check API key in Authorization header
-    auth_header = request.headers.get("authorization", "")
-    if auth_header.startswith("Bearer "):
-        raw_key = auth_header[7:]
-        # Use dependency override if set (for testing), otherwise use real get_db
-        db_factory = app.dependency_overrides.get(get_db, get_db)
-        db_gen = db_factory()
-        db = next(db_gen)
-        try:
+        # Check API key in Authorization header
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            raw_key = auth_header[7:]
             api_key = auth_service.validate_api_key(db, raw_key)
             if api_key is not None:
                 return await call_next(request)
-        finally:
-            with contextlib.suppress(StopIteration):
-                next(db_gen)
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(db_gen)
 
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -162,8 +163,8 @@ if TESTING:
         for model in [Goal, ResultEntry, MetricEntry, JournalEntry, ApiKey, User]:
             db.query(model).delete()
         db.commit()
-        auth_service.clear_sessions()
-        auth_service.clear_challenges()
-        auth_service.clear_rate_limits()
+        auth_service.clear_sessions(db)
+        auth_service.clear_challenges(db)
+        auth_service.clear_rate_limits(db)
         seed(db)
         return {"status": "reset"}

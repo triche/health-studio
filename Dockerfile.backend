@@ -5,7 +5,7 @@ RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 WORKDIR /app
 
 COPY pyproject.toml ./
-RUN pip install --no-cache-dir . && pip install --no-cache-dir ".[dev]"
+RUN pip install --no-cache-dir .
 
 COPY . .
 

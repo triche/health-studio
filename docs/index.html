@@ -70,6 +70,7 @@
       <li><strong>Dark/Light mode</strong> — Toggle between themes; preference persisted</li>
       <li><strong>Responsive layout</strong> — Collapsible sidebar for mobile</li>
       <li><strong>CLI</strong> — Command-line interface for managing data from the terminal</li>
+      <li><strong>Export / Import</strong> — JSON backup, CSV per entity, Markdown journals; restore and bulk import</li>
     </ul>
 
     <h2>Quick Start</h2>
@@ -170,12 +171,22 @@
       <tr><td>GET</td><td><code>/api/dashboard/summary</code></td><td>Aggregated overview</td></tr>
     </table>
 
+    <h3>Export / Import</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/export/json</code></td><td>Full JSON backup</td></tr>
+      <tr><td>GET</td><td><code>/api/export/csv/{entity}</code></td><td>CSV export per entity</td></tr>
+      <tr><td>GET</td><td><code>/api/export/journals/markdown</code></td><td>Journals as Markdown</td></tr>
+      <tr><td>POST</td><td><code>/api/import/json</code></td><td>Import JSON backup</td></tr>
+      <tr><td>POST</td><td><code>/api/import/csv/{entity}</code></td><td>Import CSV (metrics/results)</td></tr>
+    </table>
+
     <h2>CLI</h2>
     <p>Install the CLI for terminal-based access:</p>
     <pre><code>cd cli && pip install -e ".[dev]"
 hs config init
 hs config set url http://localhost:8000
 hs config set api-key &lt;your-key&gt;</code></pre>
-    <p>Available commands: <code>hs dashboard</code>, <code>hs journal</code>, <code>hs metrics</code>, <code>hs results</code>, <code>hs goals</code>, <code>hs config</code>.</p>
+    <p>Available commands: <code>hs dashboard</code>, <code>hs journal</code>, <code>hs metrics</code>, <code>hs results</code>, <code>hs goals</code>, <code>hs export</code>, <code>hs import</code>, <code>hs config</code>.</p>
   </body>
 </html>

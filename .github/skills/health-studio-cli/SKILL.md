@@ -76,6 +76,11 @@ After gathering data via the CLI:
 | Journal entries | `hs journal list [--since YYYY-MM-DD] [--limit N]` |
 | Read entry | `hs journal show <journal_id>` |
 | Create entry | `hs journal create --title TEXT [--file PATH] [--editor] [--date YYYY-MM-DD]` |
+| Export JSON backup | `hs export json <output_path>` |
+| Export CSV | `hs export csv <entity> <output_path>` |
+| Export journals Markdown | `hs export markdown <output_path>` |
+| Import JSON backup | `hs import json <input_path>` |
+| Import CSV | `hs import csv <entity> <input_path>` |
 
 See [CLI Reference](./references/cli-reference.md) for full details on every command.
 

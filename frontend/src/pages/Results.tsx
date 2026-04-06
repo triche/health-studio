@@ -31,7 +31,10 @@ export default function Results() {
   const [entryHours, setEntryHours] = useState("");
   const [entryMinutes, setEntryMinutes] = useState("");
   const [entrySeconds, setEntrySeconds] = useState("");
-  const [entryDate, setEntryDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [entryDate, setEntryDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [entryNotes, setEntryNotes] = useState("");
   const [entryIsRx, setEntryIsRx] = useState(false);
 

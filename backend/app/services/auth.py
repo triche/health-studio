@@ -28,23 +28,11 @@ from app.config import (
     SESSION_IDLE_TIMEOUT,
 )
 from app.models.api_key import ApiKey
+from app.models.auth_state import AuthChallenge, AuthRateLimit, AuthSession
 from app.models.user import User
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
-
-# ---------------------------------------------------------------------------
-# In-memory stores (single-process deployment)
-# ---------------------------------------------------------------------------
-
-# challenge_store: {challenge_bytes_hex: {"challenge": bytes, "created_at": float}}
-_challenge_store: dict[str, dict] = {}
-
-# session_store: {token: {"created_at": float, "last_seen": float}}
-_session_store: dict[str, dict] = {}
-
-# rate_limit_store: {ip: [timestamp, ...]}
-_rate_limit_store: dict[str, list[float]] = {}
 
 RATE_LIMIT_MAX = 5
 RATE_LIMIT_WINDOW = 60  # seconds
@@ -53,87 +41,117 @@ RATE_LIMIT_WINDOW = 60  # seconds
 # ---------------------------------------------------------------------------
 # Challenge helpers
 # ---------------------------------------------------------------------------
-def _store_challenge(challenge: bytes, **extra: object) -> None:
+def _store_challenge(db: Session, challenge: bytes, *, display_name: str | None = None) -> None:
     key = challenge.hex()
-    _challenge_store[key] = {"challenge": challenge, "created_at": time.time(), **extra}
+    db.query(AuthChallenge).filter(AuthChallenge.challenge_hex == key).delete()
+    entry = AuthChallenge(
+        challenge_hex=key,
+        challenge=challenge,
+        created_at=time.time(),
+        display_name=display_name,
+    )
+    db.add(entry)
+    db.commit()
 
 
-def _pop_challenge(challenge: bytes) -> bytes | None:
+def _pop_challenge(db: Session, challenge: bytes) -> bytes | None:
     key = challenge.hex()
-    entry = _challenge_store.pop(key, None)
+    entry = db.query(AuthChallenge).filter(AuthChallenge.challenge_hex == key).first()
     if entry is None:
         return None
-    if time.time() - entry["created_at"] > CHALLENGE_TTL:
+    if time.time() - entry.created_at > CHALLENGE_TTL:
+        db.delete(entry)
+        db.commit()
         return None
-    return entry["challenge"]
+    result = bytes(entry.challenge)
+    db.delete(entry)
+    db.commit()
+    return result
 
 
-def clear_challenges() -> None:
-    """For testing only."""
-    _challenge_store.clear()
+def clear_challenges(db: Session) -> None:
+    """Remove all stored challenges."""
+    db.query(AuthChallenge).delete()
+    db.commit()
 
 
 # ---------------------------------------------------------------------------
 # Session helpers
 # ---------------------------------------------------------------------------
-def create_session() -> str:
+def create_session(db: Session) -> str:
     token = secrets.token_urlsafe(32)
     now = time.time()
-    _session_store[token] = {"created_at": now, "last_seen": now}
+    entry = AuthSession(token=token, created_at=now, last_seen=now)
+    db.add(entry)
+    db.commit()
     return token
 
 
-def validate_session(token: str | None) -> bool:
+def validate_session(db: Session, token: str | None) -> bool:
     if not token:
         return False
-    session = _session_store.get(token)
+    session = db.query(AuthSession).filter(AuthSession.token == token).first()
     if session is None:
         return False
     now = time.time()
-    if now - session["last_seen"] > SESSION_IDLE_TIMEOUT:
-        _session_store.pop(token, None)
+    if now - session.last_seen > SESSION_IDLE_TIMEOUT:
+        db.delete(session)
+        db.commit()
         return False
-    if now - session["created_at"] > SESSION_ABSOLUTE_TIMEOUT:
-        _session_store.pop(token, None)
+    if now - session.created_at > SESSION_ABSOLUTE_TIMEOUT:
+        db.delete(session)
+        db.commit()
         return False
-    session["last_seen"] = now
+    session.last_seen = now
+    db.commit()
     return True
 
 
-def delete_session(token: str | None) -> None:
+def delete_session(db: Session, token: str | None) -> None:
     if token:
-        _session_store.pop(token, None)
+        db.query(AuthSession).filter(AuthSession.token == token).delete()
+        db.commit()
 
 
-def clear_sessions() -> None:
-    """For testing only."""
-    _session_store.clear()
+def clear_sessions(db: Session) -> None:
+    """Remove all sessions."""
+    db.query(AuthSession).delete()
+    db.commit()
 
 
 # ---------------------------------------------------------------------------
 # Rate limiting
 # ---------------------------------------------------------------------------
-def check_rate_limit(ip: str) -> None:
+def check_rate_limit(db: Session, ip: str) -> None:
     now = time.time()
-    timestamps = _rate_limit_store.get(ip, [])
-    timestamps = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
-    if len(timestamps) >= RATE_LIMIT_MAX:
+    cutoff = now - RATE_LIMIT_WINDOW
+    # Clean up expired entries for this IP
+    db.query(AuthRateLimit).filter(
+        AuthRateLimit.ip == ip, AuthRateLimit.attempted_at < cutoff
+    ).delete()
+    db.commit()
+    count = (
+        db.query(AuthRateLimit)
+        .filter(AuthRateLimit.ip == ip, AuthRateLimit.attempted_at >= cutoff)
+        .count()
+    )
+    if count >= RATE_LIMIT_MAX:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many failed attempts. Try again later.",
         )
-    _rate_limit_store[ip] = timestamps
 
 
-def record_failed_attempt(ip: str) -> None:
-    now = time.time()
-    timestamps = _rate_limit_store.setdefault(ip, [])
-    timestamps.append(now)
+def record_failed_attempt(db: Session, ip: str) -> None:
+    entry = AuthRateLimit(ip=ip, attempted_at=time.time())
+    db.add(entry)
+    db.commit()
 
 
-def clear_rate_limits() -> None:
-    """For testing only."""
-    _rate_limit_store.clear()
+def clear_rate_limits(db: Session) -> None:
+    """Remove all rate limit entries."""
+    db.query(AuthRateLimit).delete()
+    db.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +184,7 @@ def begin_registration(db: Session, display_name: str) -> dict:
         ),
     )
 
-    _store_challenge(options.challenge, display_name=display_name)
+    _store_challenge(db, options.challenge, display_name=display_name)
 
     # Serialize to JSON-compatible dict
     from webauthn.helpers import options_to_json
@@ -175,14 +193,16 @@ def begin_registration(db: Session, display_name: str) -> dict:
 
 
 def complete_registration(db: Session, credential: dict) -> User:
-    # Find the stored challenge
+    # Find a valid stored challenge
+    now = time.time()
+    cutoff = now - CHALLENGE_TTL
+    entry = db.query(AuthChallenge).filter(AuthChallenge.created_at > cutoff).first()
+
     challenge = None
     display_name = "User"
-    for _key, entry in list(_challenge_store.items()):
-        if time.time() - entry["created_at"] <= CHALLENGE_TTL:
-            challenge = entry["challenge"]
-            display_name = entry.get("display_name", "User")
-            break
+    if entry is not None:
+        challenge = bytes(entry.challenge)
+        display_name = entry.display_name or "User"
 
     if challenge is None:
         raise HTTPException(
@@ -199,7 +219,7 @@ def complete_registration(db: Session, credential: dict) -> User:
     verification = verify_registration_response(credential, challenge)
 
     # Pop the used challenge
-    _pop_challenge(challenge)
+    _pop_challenge(db, challenge)
 
     user = db.query(User).first()
     if user is None:
@@ -246,7 +266,7 @@ def begin_authentication(db: Session) -> dict:
         user_verification=UserVerificationRequirement.PREFERRED,
     )
 
-    _store_challenge(options.challenge)
+    _store_challenge(db, options.challenge)
 
     from webauthn.helpers import options_to_json
 
@@ -261,12 +281,14 @@ def complete_authentication(db: Session, credential: dict) -> str:
             detail="No registered user found.",
         )
 
-    # Find the stored challenge
+    # Find a valid stored challenge
+    now = time.time()
+    cutoff = now - CHALLENGE_TTL
+    entry = db.query(AuthChallenge).filter(AuthChallenge.created_at > cutoff).first()
+
     challenge = None
-    for _key, entry in list(_challenge_store.items()):
-        if time.time() - entry["created_at"] <= CHALLENGE_TTL:
-            challenge = entry["challenge"]
-            break
+    if entry is not None:
+        challenge = bytes(entry.challenge)
 
     if challenge is None:
         raise HTTPException(
@@ -277,14 +299,14 @@ def complete_authentication(db: Session, credential: dict) -> str:
     verification = verify_authentication_response(credential, challenge, user)
 
     # Pop the used challenge
-    _pop_challenge(challenge)
+    _pop_challenge(db, challenge)
 
     # Update sign count
     user.sign_count = verification.new_sign_count
     db.commit()
 
     # Create session
-    return create_session()
+    return create_session(db)
 
 
 def verify_authentication_response(credential: dict, challenge: bytes, user: User):

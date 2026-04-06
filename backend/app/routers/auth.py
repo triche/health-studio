@@ -26,7 +26,7 @@ keys_router = APIRouter(prefix="/api/keys", tags=["api_keys"])
 def auth_status(request: Request, db: Session = Depends(get_db)):
     registered = auth_service.is_registered(db)
     session_token = request.cookies.get("session")
-    authenticated = auth_service.validate_session(session_token)
+    authenticated = auth_service.validate_session(db, session_token)
     return AuthStatusResponse(registered=registered, authenticated=authenticated)
 
 
@@ -49,7 +49,7 @@ def complete_register(request: Request, credential: dict, db: Session = Depends(
 # ---------------------------------------------------------------------------
 @router.post("/login")
 def begin_login(request: Request, db: Session = Depends(get_db)):
-    auth_service.check_rate_limit(request.client.host if request.client else "unknown")
+    auth_service.check_rate_limit(db, request.client.host if request.client else "unknown")
     return auth_service.begin_authentication(db)
 
 
@@ -61,11 +61,11 @@ def complete_login(
     db: Session = Depends(get_db),
 ):
     client_ip = request.client.host if request.client else "unknown"
-    auth_service.check_rate_limit(client_ip)
+    auth_service.check_rate_limit(db, client_ip)
     try:
         session_token = auth_service.complete_authentication(db, credential)
     except Exception:
-        auth_service.record_failed_attempt(client_ip)
+        auth_service.record_failed_attempt(db, client_ip)
         raise
     response.set_cookie(
         key="session",
@@ -82,9 +82,9 @@ def complete_login(
 # Logout
 # ---------------------------------------------------------------------------
 @router.post("/logout")
-def logout(request: Request, response: Response):
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     session_token = request.cookies.get("session")
-    auth_service.delete_session(session_token)
+    auth_service.delete_session(db, session_token)
     response.delete_cookie(key="session", path="/api")
     return {"status": "ok"}
 
