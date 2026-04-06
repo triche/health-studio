@@ -12,12 +12,7 @@ test.describe("Journal", () => {
 
     await page.locator("#title").fill("E2E Test Journal");
     await page.locator("#entry_date").fill("2025-06-15");
-    await page.locator("#content").fill("# Hello from E2E\n\nThis is a test entry.");
-
-    // Preview markdown
-    await page.getByRole("button", { name: "Preview" }).click();
-    await expect(page.locator("h1").filter({ hasText: "Hello from E2E" })).toBeVisible();
-    await page.getByRole("button", { name: "Edit" }).click();
+    await page.locator(".w-md-editor-text-input").fill("# Hello from E2E\n\nThis is a test entry.");
 
     // Submit
     await page.getByRole("button", { name: "Create" }).click();

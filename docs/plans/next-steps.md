@@ -16,6 +16,7 @@ A review of the full codebase as of April 2026. All 10 implementation phases are
 - [Testing Gaps](#testing-gaps)
 - [Docker & Deployment](#docker--deployment)
 - [Feature Ideas](#feature-ideas)
+- [Digital Thread — Cross-Linking & Contextual Connections](#digital-thread--cross-linking--contextual-connections)
 
 ---
 
@@ -59,20 +60,13 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 Even for local use, `X-Frame-Options: DENY` prevents clickjacking if the port is accidentally exposed.
 
-### In-Memory Auth State
+### In-Memory Auth State ✅ Implemented
 
-Sessions, challenges, and rate limits all live in Python dicts. A process restart wipes all sessions (every user gets logged out) and resets rate limits. This is fine for single-process `uvicorn`, but:
+Sessions, challenges, and rate limits are now persisted in SQLite via three new models (`AuthSession`, `AuthChallenge`, `AuthRateLimit`) with an Alembic migration. Process restarts no longer wipe sessions or reset rate limits. Multi-worker sharing would still require Redis.
 
-- **If you ever run multiple workers**, sessions won't be shared
-- **Restarts during updates** force re-login
+### Dev Dependencies in Production Docker Image ✅ Implemented
 
-**Options:** SQLite-backed sessions (simplest), or Redis if you ever scale beyond one process.
-
-### Dev Dependencies in Production Docker Image
-
-`Dockerfile.backend` installs `.[dev]` which pulls pytest, ruff, httpx, and pip-audit into the production image. These add attack surface and image size for no benefit.
-
-**Fix:** Change to `pip install .` (no extras) in the Dockerfile, or use a multi-stage build like the frontend does.
+`Dockerfile.backend` now installs only production dependencies (`pip install .` without `.[dev]`), removing pytest, ruff, httpx, and pip-audit from the production image.
 
 ### SQLite Encryption at Rest
 
@@ -82,9 +76,9 @@ The database file is plain-text on disk. If the host is compromised, all health 
 
 ## Frontend Quality of Life
 
-### Markdown Editor Toolbar
+### Markdown Editor Toolbar ✅ Implemented
 
-Journal and goal plan editors are raw Markdown textareas. A formatting toolbar (bold, italic, heading, list, link buttons) would lower the bar for quick entries. `@uiw/react-md-editor` already supports this — it just needs to be wired up with a toolbar config.
+Journal and goal plan editors now use a reusable `MarkdownEditor` component wrapping `@uiw/react-md-editor` with a toolbar providing bold, italic, strikethrough, headings (H1–H4 dropdown), quote, lists (unordered, ordered, checklist), link, image, and horizontal rule. Auto-syncs dark/light mode.
 
 ### Keyboard Shortcuts
 
@@ -307,6 +301,104 @@ Currently journals are a flat chronological list. Tags (e.g., `#recovery`, `#nut
 
 ### Notes on Dashboard Cards
 The dashboard shows recent PRs and metrics but with limited context. Showing the associated notes inline (truncated) would add valuable context at a glance.
+
+---
+
+## Digital Thread — Cross-Linking & Contextual Connections
+
+Health data is most valuable when it's connected. A journal entry about tweaking your squat form is more useful when it links to your back squat PR history and your "Squat 405" goal. A goal is more motivating when you can see every journal reflection, logged result, and metric milestone that relates to it. The vision: Health Studio as a **digital thread** that weaves your mental and physical health narrative together.
+
+### Entity Mentions in Journal Entries — High Value, Moderate Effort
+
+Allow referencing goals, metrics, results, and exercise types inline within journal markdown using a link syntax (e.g., `[[goal:Squat 405]]`, `[[metric:Body Weight]]`, `[[result:Back Squat]]`). The editor would provide autocomplete — type `[[` and get a searchable dropdown of all entities across types.
+
+**Backend:** A `journal_mentions` join table (`journal_id`, `entity_type`, `entity_id`) populated on save by parsing the journal body. An endpoint like `GET /api/journals/{id}/mentions` returns the resolved entities.
+
+**Frontend:** Render mentions as styled inline links/chips that navigate to the referenced entity's page. The markdown editor gets an autocomplete popup triggered by `[[`.
+
+### Backlinks — Show What References an Entity
+
+The inverse of mentions. On every goal, metric, exercise type, and result detail page, show a "Referenced in" section at the bottom listing journal entries (and potentially other entities) that link to it, sorted by date.
+
+**Backend:** `GET /api/goals/{id}/backlinks`, `GET /api/metrics/types/{id}/backlinks`, `GET /api/results/types/{id}/backlinks` — queries the `journal_mentions` table filtered by entity type and ID.
+
+**Frontend:** A reusable `<Backlinks />` component that fetches and displays a list of linking journal entries with date, title (first line), and a snippet of surrounding context.
+
+### Bidirectional Links Between Any Entities
+
+Mentions in journals are a start, but connections exist everywhere:
+
+- A **goal** relates to a **metric type** or **exercise type** (this already exists via `target_type` / `target_id`)
+- A **result entry** might inspire a **journal reflection**
+- A **metric milestone** (hitting a goal weight) connects to the **goal** it achieved
+
+A general-purpose `entity_links` table (`source_type`, `source_id`, `target_type`, `target_id`, `link_type`, `created_at`) would support arbitrary connections. Link types could include `mentions`, `inspired_by`, `achieved`, `related_to`. This is the foundation for a true knowledge graph of your health journey.
+
+### Unified Timeline / Activity Feed
+
+Currently each entity type lives on its own page. A unified timeline view would interleave all activity chronologically:
+
+- Journal entries (full or summarized)
+- Metric entries (with sparkline context)
+- Result entries (with PR indicators)
+- Goal milestones (created, progress checkpoints, completed)
+
+This becomes the "home feed" of your health narrative — scroll through and see the full story. Filter by entity type, date range, or tag. Each item links to its detail page.
+
+### Contextual Previews (Hover Cards)
+
+When hovering over a mention link in a journal entry or a backlink on a goal page, show a hover card with a preview: the goal's progress bar and current value, the metric's recent trend sparkline, or the result's latest entry and PR status. Avoids constant page-hopping when reviewing connected data.
+
+### Smart Suggestions — "You Might Want to Link"
+
+When writing or editing a journal entry, analyze the text for keywords that match existing entity names and suggest links. If you type "hit a new PR on deadlift today," Health Studio could suggest linking to the Deadlift exercise type and any active deadlift-related goals. This lowers the friction of building connections — you don't have to remember exact names or manually search.
+
+**Implementation:** On the frontend, debounced text analysis against a cached list of entity names. Suggestions appear as a non-intrusive panel or inline hints. Accepting a suggestion inserts the `[[entity:Name]]` syntax.
+
+### Graph Visualization
+
+For users with rich data, a force-directed graph view showing how entities connect: journals as nodes linked to the goals, metrics, and results they mention. Clusters would emerge naturally — your "strength training" cluster, your "recovery & sleep" cluster, your "nutrition" cluster. Libraries like D3 or react-force-graph could power this.
+
+This is higher effort and more of a "delight" feature, but it's the most visceral expression of the digital thread concept — literally seeing the web of your health journey.
+
+### Search Across Everything
+
+A global search bar that queries across all entity types simultaneously: journals (full-text on body), goals (name, plan), metrics (type name, notes), results (type name, notes). Results grouped by type with inline previews. This is the fastest way to pull on a thread — search "shoulder" and see your shoulder press PRs, the journal entry about your shoulder rehab, the metric tracking shoulder mobility, and the goal to overhead press bodyweight.
+
+**Backend:** A `GET /api/search?q=shoulder` endpoint that queries across tables with `LIKE` (or SQLite FTS5 for better performance on large datasets).
+
+**Frontend:** A command-palette style search (`Ctrl+K` or `/`) with grouped, navigable results.
+
+### Tags as Connective Tissue
+
+The "Tags / Categories for Journals" idea from above becomes more powerful in context. Extend tags beyond journals to **all** entity types. Tag a goal `#strength`, tag a metric type `#strength`, tag journal entries about lifting `#strength` — then filter the unified timeline or graph view by tag to see everything in that thread.
+
+**Backend:** A polymorphic `entity_tags` table (`entity_type`, `entity_id`, `tag`). Endpoints to add/remove tags on any entity and filter any list endpoint by tag.
+
+### Weekly Digest with Thread Highlights
+
+Extend the weekly/monthly reports idea with connection awareness. The digest would highlight:
+
+- Goals that were mentioned in journal entries this week (active reflection)
+- Goals that had **no** journal mentions or logged results (stale goals)
+- Metrics with notable changes that correlate with journal themes
+- New connections formed (entities linked for the first time)
+
+This turns the report from a stats summary into a narrative review of your week.
+
+### Implementation Sequencing
+
+A pragmatic order for building toward the full digital thread:
+
+1. **Entity mentions in journals + backlinks** — highest value, establishes the core linking pattern
+2. **Global search** — immediate utility even without explicit links
+3. **Unified timeline** — makes the connected data visible in one place
+4. **Tags across all entities** — lightweight connective tissue, enhances filtering everywhere
+5. **Smart suggestions** — reduces friction, increases link density organically
+6. **Contextual hover previews** — polish that makes browsing connections fluid
+7. **Bidirectional entity links table** — generalizes the system beyond journal mentions
+8. **Weekly digest with thread highlights** — leverages all the above for automated insight
+9. **Graph visualization** — the capstone, most impactful once there's rich connected data
 
 ---
 

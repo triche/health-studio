@@ -5,6 +5,45 @@ import { MemoryRouter } from "react-router-dom";
 import JournalList from "../src/pages/JournalList";
 import JournalEdit from "../src/pages/JournalEdit";
 
+// Mock react-md-editor to avoid complex rendering in tests
+vi.mock("@uiw/react-md-editor", () => {
+  const commands: Record<string, unknown> = {
+    bold: { name: "bold" },
+    italic: { name: "italic" },
+    strikethrough: { name: "strikethrough" },
+    title1: { name: "title1" },
+    title2: { name: "title2" },
+    title3: { name: "title3" },
+    title4: { name: "title4" },
+    quote: { name: "quote" },
+    unorderedListCommand: { name: "unordered-list" },
+    orderedListCommand: { name: "ordered-list" },
+    checkedListCommand: { name: "checked-list" },
+    link: { name: "link" },
+    image: { name: "image" },
+    hr: { name: "hr" },
+    divider: { name: "divider" },
+    group: () => ({ name: "group" }),
+  };
+  const MDEditor = ({
+    value,
+    onChange,
+    "data-testid": testId,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    "data-testid"?: string;
+    commands?: unknown[];
+  }) => (
+    <textarea
+      data-testid={testId || "md-editor"}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+  return { default: MDEditor, commands };
+});
+
 const mockListJournals = vi.fn();
 const mockDeleteJournal = vi.fn();
 const mockCreateJournal = vi.fn();
@@ -215,7 +254,7 @@ describe("JournalEdit", () => {
     expect(screen.getByText("New Journal Entry")).toBeInTheDocument();
     expect(screen.getByLabelText("Title")).toBeInTheDocument();
     expect(screen.getByLabelText("Date")).toBeInTheDocument();
-    expect(screen.getByLabelText("Content (Markdown)")).toBeInTheDocument();
+    expect(screen.getByTestId("md-editor")).toBeInTheDocument();
   });
 
   it("creates a new journal entry on submit", async () => {
@@ -238,8 +277,8 @@ describe("JournalEdit", () => {
 
     await user.clear(screen.getByLabelText("Title"));
     await user.type(screen.getByLabelText("Title"), "Test");
-    await user.clear(screen.getByLabelText("Content (Markdown)"));
-    await user.type(screen.getByLabelText("Content (Markdown)"), "Body");
+    await user.clear(screen.getByTestId("md-editor"));
+    await user.type(screen.getByTestId("md-editor"), "Body");
 
     await user.click(screen.getByText("Create"));
 

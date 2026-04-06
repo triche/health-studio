@@ -7,6 +7,7 @@ import { listExerciseTypes } from "../api/results";
 import type { Goal, GoalCreate } from "../types/goal";
 import type { MetricType } from "../types/metric";
 import type { ExerciseType } from "../types/result";
+import MarkdownEditor from "../components/MarkdownEditor";
 
 export default function Goals() {
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -364,17 +365,8 @@ export default function Goals() {
             />
           </div>
           <div className="mb-3">
-            <label htmlFor="goal-plan" className="mb-1 block text-sm text-light-text/70">
-              Plan (Markdown)
-            </label>
-            <textarea
-              id="goal-plan"
-              data-testid="md-editor"
-              value={plan}
-              onChange={(e) => setPlan(e.target.value)}
-              className="w-full rounded-lg border border-light-text/20 bg-dark-bg px-3 py-2 text-light-text"
-              rows={4}
-            />
+            <label className="mb-1 block text-sm text-light-text/70">Plan (Markdown)</label>
+            <MarkdownEditor value={plan} onChange={setPlan} height={150} data-testid="md-editor" />
           </div>
           <div className="mb-3 grid grid-cols-2 gap-3">
             <div>

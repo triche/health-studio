@@ -46,7 +46,7 @@ test.describe("Responsive Layout", () => {
     await page.getByRole("link", { name: "New Entry" }).click();
     await page.locator("#title").fill("Mobile Test Entry");
     await page.locator("#entry_date").fill("2025-07-01");
-    await page.locator("#content").fill("Written on mobile viewport.");
+    await page.locator(".w-md-editor-text-input").fill("Written on mobile viewport.");
     await page.getByRole("button", { name: "Create" }).click();
 
     // Verify it appears
