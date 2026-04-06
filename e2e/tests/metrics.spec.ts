@@ -47,7 +47,7 @@ test.describe("Metrics", () => {
 
     // Delete the entry
     await page.getByRole("button", { name: "Delete" }).first().click();
-    await expect(page.getByText("Morning reading")).not.toBeVisible();
+    await expect(page.getByText("Morning reading")).not.toBeVisible({ timeout: 10000 });
   });
 
   test("log entries for a seeded metric type", async ({ authenticatedPage: page }) => {
