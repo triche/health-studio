@@ -19,6 +19,7 @@ from app.models import (  # noqa: E402, F401 — register all models
     AuthChallenge,
     AuthRateLimit,
     AuthSession,
+    EntityMention,
     ExerciseType,
     Goal,
     JournalEntry,

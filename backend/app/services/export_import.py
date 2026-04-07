@@ -209,6 +209,15 @@ def import_json(db: Session, data: dict[str, Any]) -> dict[str, int]:
 
     db.commit()
     imported["skipped"] = skipped
+
+    # Re-derive entity mentions from journal content (self-healing on import)
+    from app.services.mentions import sync_mentions
+
+    journals = db.query(JournalEntry).all()
+    for journal in journals:
+        sync_mentions(db, journal.id, journal.content)
+    db.commit()
+
     return imported
 
 

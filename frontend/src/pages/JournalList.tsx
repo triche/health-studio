@@ -5,6 +5,15 @@ import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 import { listJournals, deleteJournal } from "../api/journals";
 import type { JournalEntry } from "../types/journal";
+import { renderMentions } from "../components/MentionRenderer";
+import type { ReactNode } from "react";
+
+function renderMentionsInChildren(children: ReactNode): ReactNode {
+  if (typeof children === "string") return renderMentions(children);
+  if (Array.isArray(children))
+    return children.map((c, i) => <span key={i}>{renderMentionsInChildren(c)}</span>);
+  return children;
+}
 
 export default function JournalList() {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
@@ -108,7 +117,14 @@ export default function JournalList() {
                 </div>
                 {expandedEntries.has(entry.id) && (
                   <div className="prose prose-sm prose-invert mt-3 max-w-none rounded-lg bg-dark-bg p-3">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeSanitize]}
+                      components={{
+                        p: ({ children }) => <p>{renderMentionsInChildren(children)}</p>,
+                        li: ({ children }) => <li>{renderMentionsInChildren(children)}</li>,
+                      }}
+                    >
                       {entry.content}
                     </ReactMarkdown>
                   </div>

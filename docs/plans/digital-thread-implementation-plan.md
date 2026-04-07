@@ -12,7 +12,7 @@ This plan builds toward that vision in six phases, each delivering standalone va
 
 - [Technology Decisions](#technology-decisions)
 - [Data Model Additions](#data-model-additions)
-- [Phase 1 — Entity Mentions & Backlinks](#phase-1--entity-mentions--backlinks)
+- [Phase 1 — Entity Mentions & Backlinks ✅](#phase-1--entity-mentions--backlinks-)
 - [Phase 2 — Global Search](#phase-2--global-search)
 - [Phase 3 — Tags](#phase-3--tags)
 - [Phase 4 — Unified Timeline](#phase-4--unified-timeline)
@@ -154,7 +154,9 @@ CREATE VIRTUAL TABLE search_index USING fts5(
 
 ---
 
-## Phase 1 — Entity Mentions & Backlinks
+## Phase 1 — Entity Mentions & Backlinks ✅
+
+**Status:** Implemented (branch `triche/dt-phase1`)
 
 **Goal:** Journal entries can reference goals, metric types, and exercise types using `[[type:name]]` syntax. Referenced entities show a "Referenced in" section listing journal entries that mention them. This is the foundational linking mechanism for the entire digital thread.
 
@@ -162,182 +164,102 @@ CREATE VIRTUAL TABLE search_index USING fts5(
 
 ---
 
-### Backend
+### Backend (Implemented)
 
 **Model: `entity_mentions`**
-- New file: `backend/app/models/mention.py`
-- Fields: `id`, `journal_id` (FK to journal_entries), `entity_type`, `entity_id`, `display_text`, `created_at`
-- Register in `models/__init__.py`
+- `backend/app/models/mention.py`
+- Fields: `id`, `journal_id` (FK to journal_entries with CASCADE), `entity_type`, `entity_id`, `display_text`, `created_at`
+- UniqueConstraint on `(journal_id, entity_type, entity_id)`
+- Indexes on `journal_id` and `(entity_type, entity_id)`
 
 **Alembic migration:**
-- `alembic revision --autogenerate -m "add entity_mentions table"`
+- `backend/alembic/versions/7e8d28a29697_add_entity_mentions_table.py`
 
-**Mention parsing utility: `backend/app/services/mentions.py`**
+**Mention parsing: `backend/app/services/mentions.py`**
 
-```python
-import re
-from typing import list
-
-MENTION_PATTERN = re.compile(r'\[\[(goal|metric|exercise):([^\]]+)\]\]')
-
-def parse_mentions(content: str) -> list[tuple[str, str]]:
-    """Extract (entity_type, display_text) pairs from journal content."""
-    # Normalize entity_type: 'metric' → 'metric_type', 'exercise' → 'exercise_type'
-    ...
-
-def resolve_mentions(db, mentions: list[tuple[str, str]]) -> list[dict]:
-    """Resolve display_text to entity IDs via case-insensitive name lookup.
-    Returns list of {entity_type, entity_id, display_text} for found entities.
-    Unresolved mentions are silently skipped (no error — the raw syntax remains in the text).
-    """
-    ...
-
-def sync_mentions(db, journal_id: str, content: str) -> None:
-    """Parse content, resolve mentions, and upsert the entity_mentions table.
-    Deletes stale mentions (removed from content), inserts new ones, leaves existing.
-    Called on journal create and update.
-    """
-    ...
-```
+- `parse_mentions(content)` — Extracts `(entity_type, display_text)` tuples from journal content using case-insensitive regex. Supports aliases: `goal`/`goals`, `metric`/`metrics`/`metric_type`, `exercise`/`exercises`/`exercise_type`/`result`/`results`. All aliases map to canonical types (`goal`, `metric_type`, `exercise_type`).
+- `resolve_mentions(db, mentions)` — Resolves display names to entity IDs via case-insensitive name lookup. Unresolved mentions are silently skipped.
+- `sync_mentions(db, journal_id, content)` — Parses, resolves, and upserts the `entity_mentions` table. Deletes stale mentions, inserts new ones, leaves existing.
+- `get_journal_mentions(db, journal_id)` — Returns all mentions for a journal entry.
+- `get_backlinks(db, entity_type, entity_id)` — Returns journal entries referencing an entity, with ~200-char snippets centered on the mention.
+- `_extract_snippet(content, entity_type, display_text)` — Regex-based snippet extraction that finds any alias form of the mention in the content.
+- `get_entity_names(db)` — Returns all entity names grouped by type for autocomplete.
 
 **Service layer changes:**
-- `services/journal.py`: Call `sync_mentions(db, journal.id, data.content)` after every `create_journal` and `update_journal`. On `delete_journal`, cascade handles cleanup.
+- `services/journal.py`: Calls `sync_mentions()` after `create_journal` (with `db.flush()` to get the ID) and `update_journal` (when content changes). Cascade delete handles cleanup.
+- `services/export_import.py`: After JSON import, re-derives mentions by running `sync_mentions` on all imported journals (self-healing approach — no `entity_mentions` in the export payload).
 
-**New endpoints:**
+**Endpoints (in `backend/app/routers/mentions.py`):**
 
-`GET /api/journals/{id}/mentions` → list of resolved mentions for a journal entry.
-```json
-[
-  {"entity_type": "goal", "entity_id": "abc-123", "display_text": "Squat 405", "title": "Squat 405"},
-  {"entity_type": "exercise_type", "entity_id": "def-456", "display_text": "Back Squat", "name": "Back Squat"}
-]
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/entities/names` | All entity names grouped by type (for autocomplete) |
+| GET | `/api/journals/{id}/mentions` | Resolved mentions for a journal entry |
+| GET | `/api/goals/{id}/backlinks` | Journal entries referencing a goal |
+| GET | `/api/metric-types/{id}/backlinks` | Journal entries referencing a metric type |
+| GET | `/api/exercise-types/{id}/backlinks` | Journal entries referencing an exercise type |
 
-`GET /api/goals/{id}/backlinks` → journal entries referencing this goal.
-`GET /api/metric-types/{id}/backlinks` → journal entries referencing this metric type.
-`GET /api/exercise-types/{id}/backlinks` → journal entries referencing this exercise type.
-
-All backlinks endpoints return:
-```json
-[
-  {"journal_id": "xyz-789", "title": "Squat day thoughts", "entry_date": "2026-04-01", "snippet": "...working toward [[goal:Squat 405]] and felt..."}
-]
-```
-
-The `snippet` is a ~200-character excerpt from the journal content centered on the first mention occurrence, with the mention syntax intact (the frontend renders it as a link).
-
-**Schemas:**
-- New file: `backend/app/schemas/mention.py`
+**Schemas (`backend/app/schemas/mention.py`):**
 - `MentionResponse`: entity_type, entity_id, display_text
 - `BacklinkResponse`: journal_id, title, entry_date, snippet
-
-**Router:**
-- New file: `backend/app/routers/mentions.py` — mounts under `/api`
-- Alternatively, add backlink endpoints to existing entity routers (goals, metrics, results)
-
-**Entity names endpoint (for autocomplete):**
-
-`GET /api/entities/names` → combined name list across entity types.
-```json
-{
-  "goals": [{"id": "abc-123", "name": "Squat 405"}],
-  "metric_types": [{"id": "def-456", "name": "Body Weight"}],
-  "exercise_types": [{"id": "ghi-789", "name": "Back Squat"}]
-}
-```
-
-This can live in a new `routers/entities.py` or be added to an existing router.
+- `EntityNameItem`, `EntityNamesResponse`
 
 ---
 
-### Frontend
+### Frontend (Implemented)
 
-**Mention autocomplete in MarkdownEditor:**
-- Detect `[[` typed in the editor textarea
-- Show a floating dropdown with entity names, filtered as the user types
-- Selecting an item inserts `[[type:Name]]` and closes the dropdown
-- The dropdown is grouped by entity type with type headers: Goals, Metrics, Exercises
-- Escape or clicking outside dismisses
-- Fetch entity names on mount via `GET /api/entities/names`, cache in state
+**Mention autocomplete (`MentionAutocomplete.tsx`):**
+- Detects `[[` from React `value` prop changes (not native DOM events) for reliable MDEditor integration
+- Shows a floating dropdown positioned at the cursor using the Range API on MDEditor's visible `<pre><code>` element
+- Dropdown grouped by entity type with headers: Goals, Metrics, Exercises
+- Filters as user types after `[[`; keyboard navigation (↑/↓/Enter/Tab/Escape)
+- Selecting an item inserts `[[type:Name]]` into the editor content
+- Entity names fetched on mount via `GET /api/entities/names`, cached in state
+- Keyboard events captured in capture phase on the container to intercept before MDEditor
 
-**Implementation approach:** The `@uiw/react-md-editor` component exposes the underlying CodeMirror/textarea. Attach a `keyup` listener that detects `[[` sequences and positions a portal-rendered dropdown. This is a self-contained component (`MentionAutocomplete.tsx`) composed into the editor.
+**Mention rendering (`MentionRenderer.tsx`):**
+- Case-insensitive regex matching all aliases (`goal`, `goals`, `metric`, `metrics`, `exercise`, `exercises`, `result`, `results`, `metric_type`, `exercise_type`)
+- `ALIAS_MAP` normalizes any alias to a canonical config key
+- Renders mentions as styled pill links with emoji icons (🎯 goals, 📊 metrics, 🏋️ exercises)
+- Integrated into journal list via custom `react-markdown` components for `<p>` and `<li>` elements
 
-**Mention rendering in journal view:**
-- When rendering journal Markdown (via `react-markdown`), add a custom remark plugin or rehype plugin that transforms `[[type:name]]` into `<a>` tags linking to the appropriate page:
-  - `[[goal:Squat 405]]` → `/goals` (scrolled/filtered to that goal)
-  - `[[metric:Body Weight]]` → `/metrics?type={id}`
-  - `[[exercise:Back Squat]]` → `/results?type={id}`
-- Style mention links distinctively (pill/chip style with an icon prefix per entity type)
+**MarkdownEditor integration (`MarkdownEditor.tsx`):**
+- Wraps MDEditor in a container div with `ref` passed to MentionAutocomplete
+- `handleInsert` callback replaces value with `before + mention + after`
 
-**New component: `Backlinks.tsx`**
-- Reusable component that takes `entityType` and `entityId` props
-- Fetches `GET /api/{entity-type-path}/{id}/backlinks`
-- Renders a "Referenced in journals" section:
-  - Each entry shows: journal title (linked), entry date, snippet with highlighted mention
-  - Empty state: "No journal entries reference this yet"
-- Added to: `Goals.tsx` (in the goal detail/expanded view), `Metrics.tsx` (in metric type detail), `Results.tsx` (in exercise type detail)
+**Backlinks component (`Backlinks.tsx`):**
+- Reusable component taking `entityType` and `entityId` props
+- Fetches backlinks from the appropriate endpoint based on entity type
+- Renders "Referenced in Journals" section with linked journal titles, dates, and snippets
+- Empty state: "No journal entries reference this yet"
+- Integrated into: `Goals.tsx`, `Metrics.tsx`, `Results.tsx`
 
-**New types:**
-- `frontend/src/types/mention.ts`: `Mention`, `Backlink`, `EntityNames`
-
-**New API functions:**
-- `frontend/src/api/mentions.ts`: `getEntityNames()`, `getJournalMentions(id)`, `getBacklinks(entityType, entityId)`
-
----
-
-### CLI
-
-- `hs journal show <id>` — append a "Mentions:" section showing linked entities
-- No CLI support needed for autocomplete (that's a UI feature)
+**New files:**
+- `frontend/src/types/mention.ts` — `Mention`, `Backlink`, `EntityNameItem`, `EntityNames` interfaces
+- `frontend/src/api/mentions.ts` — `getEntityNames()`, `getJournalMentions()`, `getBacklinks()` with `BACKLINK_PATHS` mapping
 
 ---
 
-### Tests
+### Tests (Implemented)
 
-**Backend (pytest):**
-- `test_mentions.py`:
-  - `test_parse_mentions` — extracts mentions from content with various syntax patterns
-  - `test_parse_mentions_empty` — no mentions in content returns empty list
-  - `test_parse_mentions_duplicates` — same entity mentioned twice returns one mention
-  - `test_resolve_mentions_found` — resolves display name to entity ID
-  - `test_resolve_mentions_not_found` — unknown name is silently skipped
-  - `test_resolve_mentions_case_insensitive` — "back squat" matches "Back Squat"
-  - `test_sync_mentions_on_create` — creating a journal with mentions populates entity_mentions
-  - `test_sync_mentions_on_update` — editing journal content adds/removes mentions
-  - `test_sync_mentions_on_delete` — deleting journal cascades to entity_mentions
-  - `test_backlinks_endpoint` — returns journal entries that reference a goal
-  - `test_backlinks_empty` — entity with no references returns empty list
-  - `test_backlinks_snippet` — snippet is ~200 chars centered on the mention
-  - `test_entity_names_endpoint` — returns all entity names grouped by type
-  - `test_mentions_endpoint` — returns resolved mentions for a journal entry
+**Backend — `backend/tests/test_mentions.py` (30 tests across 6 classes):**
+- `TestParseMentions` — basic mentions, exercise mentions, empty content, deduplication, multiple types, invalid types ignored, alias parsing (`Results`, `Goals`, `Metrics`), case-insensitive types
+- `TestResolveMentions` — resolve goal/metric_type/exercise_type by name, not-found skipped, case-insensitive matching
+- `TestSyncMentions` — sync on create, sync on update (mentions replaced), cascade on delete
+- `TestBacklinks` — goal/metric/exercise backlinks, empty backlinks, snippet extraction, entry_date included
+- `TestEntityNames` — returns all types, empty when no entities
+- `TestMentionsEndpoint` — journal mentions, no mentions, 404 for missing journal, alias `[[Results:...]]` end-to-end sync with backlinks
 
-**Frontend (vitest):**
-- `Mentions.test.tsx`:
-  - Renders mention links in journal content
-  - Mention links navigate to correct entity pages
-  - Backlinks component shows journal entries
-  - Backlinks component shows empty state
-  - Autocomplete dropdown appears on `[[` input
-  - Autocomplete filters as user types
-  - Selecting autocomplete item inserts correct syntax
-
-**TDD order:**
-1. Write `test_parse_mentions` → implement `parse_mentions()`
-2. Write `test_resolve_mentions_*` → implement `resolve_mentions()`
-3. Write `test_sync_mentions_*` → implement `sync_mentions()` + model
-4. Write `test_backlinks_*` → implement backlinks endpoints
-5. Write `test_entity_names_*` → implement entity names endpoint
-6. Write frontend mention rendering tests → implement remark plugin
-7. Write frontend backlinks tests → implement `Backlinks.tsx`
-8. Write frontend autocomplete tests → implement `MentionAutocomplete.tsx`
+**Frontend — `frontend/tests/Mentions.test.tsx` (9 tests):**
+- Backlinks: shows referencing journals, empty state, journal links, correct API params, section heading
+- renderMentions: `[[Results:Name]]`, `[[Goals:Name]]`, `[[Metrics:Name]]` render as links, mixed-case aliases
 
 ---
 
-### Export/Import Impact
+### Export/Import Impact (Implemented)
 
-- `export_json` must include `entity_mentions` in the export payload
-- `import_json` must import `entity_mentions` (or re-derive them by re-parsing journal content on import — simpler and self-healing)
-- **Recommended:** On JSON import, after importing journals and other entities, run `sync_mentions` on every imported journal. This re-derives mentions from content, so the export doesn't need to carry `entity_mentions` at all and the import is self-healing if entity IDs differ.
+- Export does **not** include `entity_mentions` — they are derived data
+- On JSON import, after all entities are committed, `sync_mentions` runs on every imported journal to re-derive mentions (self-healing if entity IDs differ between exports)
 
 ---
 
@@ -799,7 +721,7 @@ This is fast for realistic data sizes (thousands of entries, not millions). If p
 
 - Infinite scroll (or "Load more" button) rather than traditional pagination
 - Each timeline item is a card styled by entity type:
-  - **Journal:** Title, date, first 2 lines of content (rendered Markdown), tags, mention chips
+  - **Journal:** Title, date, first 2 lines of content (rendered Markdown with mention pills via Phase 1's `renderMentions()`), tags, mention chips
   - **Result:** Exercise name, value (with PR badge if applicable), date, notes excerpt, tags
   - **Metric:** Metric name, value + unit, date, mini sparkline (last 7 values), tags
   - **Goal:** Title, progress bar, status badge, date, tags
@@ -922,9 +844,9 @@ Returns a lightweight preview payload tailored to the entity type:
 Runs alongside the journal editor (below or beside it). As the user types:
 1. Debounce the content (500ms after last keystroke)
 2. Tokenize the current paragraph into significant words (ignore stop words)
-3. Match against the cached entity names list (from `GET /api/entities/names`)
+3. Match against the cached entity names list (already fetched by `MentionAutocomplete` from Phase 1 via `GET /api/entities/names`)
 4. Display matching entities that aren't already mentioned as suggestion chips: "Link to Back Squat?" / "Link to Squat 405?"
-5. Clicking a suggestion inserts `[[type:Name]]` at the cursor position (or at the end of the current paragraph)
+5. Clicking a suggestion inserts `[[type:Name]]` at the cursor position (reuse cursor detection infrastructure from Phase 1's `MentionAutocomplete.tsx` which uses the Range API on MDEditor's `<pre><code>` element)
 
 **Matching algorithm (client-side):**
 - Case-insensitive substring match of entity names against the journal text
@@ -936,7 +858,7 @@ This is purely client-side — no additional API calls beyond the initial entity
 
 **Hover preview cards: `EntityPreview.tsx`**
 
-- Triggered on mouseenter over mention links (in journal view) and backlink items (on entity pages)
+- Triggered on mouseenter over mention pill links (rendered by Phase 1's `MentionRenderer.tsx` in journal view) and backlink items (rendered by Phase 1's `Backlinks.tsx` on entity pages)
 - Positioned as a floating card near the hover target (portal-rendered, collision-aware)
 - Fetches `GET /api/entities/preview?type=...&id=...` on first hover, then caches
 - Renders type-specific content:
@@ -1024,7 +946,7 @@ def build_graph(db, min_connections=0, include_orphans=False) -> dict:
     Build the full graph of entity connections.
 
     1. Fetch all entities as nodes
-    2. Fetch all mention edges from entity_mentions
+    2. Fetch all mention edges from entity_mentions (Phase 1 table)
     3. Fetch all goal-target edges from goals
     4. Compute shared-tag edges from entity_tags
     5. Optionally filter orphan nodes (no edges)
@@ -1219,18 +1141,23 @@ Slightly better quality (0.821 STS) at similar size (33M params, ~120MB). Worth 
 ### Full Syntax Specification
 
 ```
-mention     = "[[" type_prefix ":" display_name "]]"
-type_prefix = "goal" | "metric" | "exercise"
-display_name = <any text except "]">
+mention       = "[[" type_prefix ":" display_name "]]"
+type_prefix   = "goal" | "goals"
+              | "metric" | "metrics" | "metric_type"
+              | "exercise" | "exercises" | "exercise_type"
+              | "result" | "results"
+display_name  = <any text except "]">
 ```
+
+Type prefixes are **case-insensitive**: `[[Goal:...]]`, `[[METRIC:...]]`, and `[[results:...]]` all work.
 
 ### Type Prefix Mapping
 
-| Syntax prefix | Database `entity_type` | Target table |
-|---------------|----------------------|--------------|
-| `goal` | `goal` | `goals` |
-| `metric` | `metric_type` | `metric_types` |
-| `exercise` | `exercise_type` | `exercise_types` |
+| Syntax prefix(es) | Database `entity_type` | Target table |
+|-------------------|----------------------|---------------|
+| `goal`, `goals` | `goal` | `goals` |
+| `metric`, `metrics`, `metric_type` | `metric_type` | `metric_types` |
+| `exercise`, `exercises`, `exercise_type`, `result`, `results` | `exercise_type` | `exercise_types` |
 
 ### Resolution Rules
 

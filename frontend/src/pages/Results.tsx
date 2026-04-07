@@ -11,6 +11,7 @@ import {
   getResultTrend,
 } from "../api/results";
 import type { ExerciseType, ResultEntry, ResultTrendResponse } from "../types/result";
+import Backlinks from "../components/Backlinks";
 
 export default function Results() {
   const [types, setTypes] = useState<ExerciseType[]>([]);
@@ -605,6 +606,9 @@ export default function Results() {
           )}
         </>
       )}
+
+      {/* Backlinks */}
+      {selectedTypeId && <Backlinks entityType="exercise_type" entityId={selectedTypeId} />}
     </div>
   );
 }

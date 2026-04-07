@@ -8,6 +8,7 @@ import type { Goal, GoalCreate } from "../types/goal";
 import type { MetricType } from "../types/metric";
 import type { ExerciseType } from "../types/result";
 import MarkdownEditor from "../components/MarkdownEditor";
+import Backlinks from "../components/Backlinks";
 
 export default function Goals() {
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -700,6 +701,9 @@ export default function Goals() {
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{goal.plan}</ReactMarkdown>
                 </div>
               )}
+
+              {/* Backlinks */}
+              {expandedPlans.has(goal.id) && <Backlinks entityType="goal" entityId={goal.id} />}
             </div>
           ))}
         </div>

@@ -67,6 +67,7 @@
       <li><strong>Results</strong> — Exercise results with automatic PR detection across Olympic lifts, powerlifts, CrossFit benchmarks, and running</li>
       <li><strong>Goals</strong> — Goal setting linked to metrics or exercises with progress tracking and Markdown plans</li>
       <li><strong>Dashboard</strong> — Aggregated overview of recent activity, active goals, latest metrics, and PRs</li>
+      <li><strong>Digital Thread</strong> — Link journal entries to goals, metrics, and exercises with <code>[[type:name]]</code> mentions; autocomplete, styled pill links, and backlinks on entity pages</li>
       <li><strong>Dark/Light mode</strong> — Toggle between themes; preference persisted</li>
       <li><strong>Responsive layout</strong> — Collapsible sidebar for mobile</li>
       <li><strong>CLI</strong> — Command-line interface for managing data from the terminal</li>
@@ -169,6 +170,16 @@
     <table>
       <tr><th>Method</th><th>Path</th><th>Description</th></tr>
       <tr><td>GET</td><td><code>/api/dashboard/summary</code></td><td>Aggregated overview</td></tr>
+    </table>
+
+    <h3>Mentions &amp; Backlinks</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/entities/names</code></td><td>All entity names (for autocomplete)</td></tr>
+      <tr><td>GET</td><td><code>/api/journals/{id}/mentions</code></td><td>Mentions in a journal entry</td></tr>
+      <tr><td>GET</td><td><code>/api/goals/{id}/backlinks</code></td><td>Journals referencing a goal</td></tr>
+      <tr><td>GET</td><td><code>/api/metric-types/{id}/backlinks</code></td><td>Journals referencing a metric</td></tr>
+      <tr><td>GET</td><td><code>/api/exercise-types/{id}/backlinks</code></td><td>Journals referencing an exercise</td></tr>
     </table>
 
     <h3>Export / Import</h3>
