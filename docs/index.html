@@ -68,6 +68,7 @@
       <li><strong>Goals</strong> — Goal setting linked to metrics or exercises with progress tracking and Markdown plans</li>
       <li><strong>Dashboard</strong> — Aggregated overview of recent activity, active goals, latest metrics, and PRs</li>
       <li><strong>Digital Thread</strong> — Link journal entries to goals, metrics, and exercises with <code>[[type:name]]</code> mentions; autocomplete, styled pill links, and backlinks on entity pages</li>
+      <li><strong>Global Search</strong> — Full-text search across all entity types via <code>Cmd+K</code> command palette; FTS5-powered with BM25 ranking, Porter stemming, prefix queries, and type filtering</li>
       <li><strong>Dark/Light mode</strong> — Toggle between themes; preference persisted</li>
       <li><strong>Responsive layout</strong> — Collapsible sidebar for mobile</li>
       <li><strong>CLI</strong> — Command-line interface for managing data from the terminal</li>
@@ -182,6 +183,12 @@
       <tr><td>GET</td><td><code>/api/exercise-types/{id}/backlinks</code></td><td>Journals referencing an exercise</td></tr>
     </table>
 
+    <h3>Search</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/search</code></td><td>Full-text search (<code>q</code>, <code>types</code>, <code>limit</code>, <code>offset</code>)</td></tr>
+    </table>
+
     <h3>Export / Import</h3>
     <table>
       <tr><th>Method</th><th>Path</th><th>Description</th></tr>
@@ -198,6 +205,6 @@
 hs config init
 hs config set url http://localhost:8000
 hs config set api-key &lt;your-key&gt;</code></pre>
-    <p>Available commands: <code>hs dashboard</code>, <code>hs journal</code>, <code>hs metrics</code>, <code>hs results</code>, <code>hs goals</code>, <code>hs export</code>, <code>hs import</code>, <code>hs config</code>.</p>
+    <p>Available commands: <code>hs dashboard</code>, <code>hs journal</code>, <code>hs metrics</code>, <code>hs results</code>, <code>hs goals</code>, <code>hs search</code>, <code>hs export</code>, <code>hs import</code>, <code>hs config</code>.</p>
   </body>
 </html>

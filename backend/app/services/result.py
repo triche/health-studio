@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 
 from app.models.result import ExerciseType, ResultEntry
+from app.services.search import index_entity, remove_from_index
 
 if TYPE_CHECKING:
     from datetime import date
@@ -36,6 +37,9 @@ def create_exercise_type(db: Session, data: ExerciseTypeCreate) -> ExerciseType:
         )
     et = ExerciseType(name=data.name, category=data.category, result_unit=data.result_unit)
     db.add(et)
+    db.flush()
+    extra = " ".join(filter(None, [data.category, data.result_unit]))
+    index_entity(db, "exercise_type", et.id, data.name, "", extra)
     db.commit()
     db.refresh(et)
     return et
@@ -71,6 +75,8 @@ def update_exercise_type(
             )
     for key, value in update_data.items():
         setattr(et, key, value)
+    extra = " ".join(filter(None, [et.category, et.result_unit]))
+    index_entity(db, "exercise_type", et.id, et.name, "", extra)
     db.commit()
     db.refresh(et)
     return et
@@ -78,6 +84,7 @@ def update_exercise_type(
 
 def delete_exercise_type(db: Session, exercise_type_id: str) -> None:
     et = get_exercise_type(db, exercise_type_id)
+    remove_from_index(db, "exercise_type", et.id)
     db.delete(et)
     db.commit()
 

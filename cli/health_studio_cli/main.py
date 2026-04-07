@@ -12,6 +12,7 @@ from health_studio_cli.commands.import_cmd import app as import_app
 from health_studio_cli.commands.journal import app as journal_app
 from health_studio_cli.commands.metrics import app as metrics_app
 from health_studio_cli.commands.results import app as results_app
+from health_studio_cli.commands.search import app as search_app
 from health_studio_cli.display import BANNER, console
 
 __version__ = "0.1.0"
@@ -31,6 +32,7 @@ app.add_typer(config_app, name="config")
 app.add_typer(dashboard_app, name="dashboard")
 app.add_typer(export_app, name="export")
 app.add_typer(import_app, name="import")
+app.add_typer(search_app, name="search")
 
 
 def _version_callback(value: bool) -> None:

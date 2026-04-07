@@ -218,6 +218,12 @@ def import_json(db: Session, data: dict[str, Any]) -> dict[str, int]:
         sync_mentions(db, journal.id, journal.content)
     db.commit()
 
+    # Rebuild full-text search index so all imported entities are searchable
+    from app.services.search import rebuild_index
+
+    rebuild_index(db)
+    db.commit()
+
     return imported
 
 

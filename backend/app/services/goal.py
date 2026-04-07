@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from app.models.goal import Goal
 from app.models.metric import MetricEntry
 from app.models.result import ResultEntry
+from app.services.search import index_entity, remove_from_index
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -111,6 +112,14 @@ def create_goal(db: Session, data: GoalCreate) -> Goal:
         deadline=data.deadline,
     )
     db.add(goal)
+    db.flush()
+    body = "\n".join(filter(None, [data.description, data.plan]))
+    extra_parts = [data.status or ""]
+    if data.target_type:
+        extra_parts.append(data.target_type)
+    if data.deadline:
+        extra_parts.append(str(data.deadline))
+    index_entity(db, "goal", goal.id, data.title, body, " ".join(extra_parts))
     db.commit()
     db.refresh(goal)
     return _enrich_goal(db, goal)
@@ -149,6 +158,13 @@ def update_goal(db: Session, goal_id: str, data: GoalUpdate) -> Goal:
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(goal, key, value)
+    body = "\n".join(filter(None, [goal.description, goal.plan]))
+    extra_parts = [goal.status or ""]
+    if goal.target_type:
+        extra_parts.append(goal.target_type)
+    if goal.deadline:
+        extra_parts.append(str(goal.deadline))
+    index_entity(db, "goal", goal.id, goal.title, body, " ".join(extra_parts))
     db.commit()
     db.refresh(goal)
     return _enrich_goal(db, goal)
@@ -158,5 +174,6 @@ def delete_goal(db: Session, goal_id: str) -> None:
     goal = db.get(Goal, goal_id)
     if goal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
+    remove_from_index(db, "goal", goal.id)
     db.delete(goal)
     db.commit()

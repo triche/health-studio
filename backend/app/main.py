@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import ALLOWED_ORIGINS, DEBUG, MAX_BODY_SIZE, TESTING
 from app.database import get_db
-from app.routers import export_import, goals, journals, mentions, metrics, results
+from app.routers import export_import, goals, journals, mentions, metrics, results, search
 from app.routers.auth import keys_router
 from app.routers.auth import router as auth_router
 from app.services import auth as auth_service
@@ -22,6 +22,7 @@ app.include_router(metrics.router)
 app.include_router(results.router)
 app.include_router(goals.router)
 app.include_router(mentions.router)
+app.include_router(search.router)
 app.include_router(export_import.router)
 
 # ---------------------------------------------------------------------------
