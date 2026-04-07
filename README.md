@@ -9,6 +9,7 @@ A local-first personal health dashboard, journal, and tracker. Consolidates ment
 - **Results** — Log exercise results with automatic PR detection across Olympic lifts, powerlifts, CrossFit benchmarks, and running
 - **Goals** — Set goals linked to metrics or exercises with progress tracking and Markdown plans
 - **Dashboard** — Aggregated overview of recent activity, active goals, latest metrics, and recent PRs
+- **Digital Thread** — Link journal entries to goals, metrics, and exercises with `[[type:name]]` mentions; autocomplete on `[[`, rendered as styled pills, with backlinks shown on entity pages
 - **Dark/Light mode** — Toggle between themes; preference persisted in localStorage
 - **Responsive layout** — Collapsible sidebar for mobile; full sidebar on desktop
 - **CLI** — Full-featured command-line interface (`hs`) for managing data from the terminal
@@ -176,6 +177,15 @@ All endpoints are prefixed with `/api`. Authentication is required for all endpo
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/dashboard/summary` | Aggregated overview |
+
+### Mentions & Backlinks
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/entities/names` | All entity names (for autocomplete) |
+| GET | `/api/journals/{id}/mentions` | Mentions in a journal entry |
+| GET | `/api/goals/{id}/backlinks` | Journals referencing a goal |
+| GET | `/api/metric-types/{id}/backlinks` | Journals referencing a metric |
+| GET | `/api/exercise-types/{id}/backlinks` | Journals referencing an exercise |
 
 ### Export / Import
 | Method | Path | Description |
