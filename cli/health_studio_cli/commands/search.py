@@ -56,7 +56,7 @@ def search(
                 print_error(detail)
             else:
                 print_error(str(e))
-            raise typer.Exit(code=1)
+            raise typer.Exit(code=1) from None
 
         data = response.json()
         results = data.get("results", [])
