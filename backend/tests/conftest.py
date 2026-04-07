@@ -37,11 +37,40 @@ TEST_ENGINE = create_engine(
 TestSessionLocal = sessionmaker(bind=TEST_ENGINE, autocommit=False, autoflush=False)
 
 
+def _create_fts5_tables(engine):
+    """Create FTS5 virtual tables that aren't managed by SQLAlchemy metadata."""
+    with engine.connect() as conn:
+        conn.execute(
+            __import__("sqlalchemy").text(
+                """
+                CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
+                    entity_type,
+                    entity_id UNINDEXED,
+                    title,
+                    body,
+                    extra,
+                    tokenize='porter unicode61'
+                )
+                """
+            )
+        )
+        conn.commit()
+
+
+def _drop_fts5_tables(engine):
+    """Drop FTS5 virtual tables."""
+    with engine.connect() as conn:
+        conn.execute(__import__("sqlalchemy").text("DROP TABLE IF EXISTS search_index"))
+        conn.commit()
+
+
 @pytest.fixture(autouse=True)
 def _setup_db():
     """Create and drop all tables around every test."""
     Base.metadata.create_all(bind=TEST_ENGINE)
+    _create_fts5_tables(TEST_ENGINE)
     yield
+    _drop_fts5_tables(TEST_ENGINE)
     Base.metadata.drop_all(bind=TEST_ENGINE)
 
 

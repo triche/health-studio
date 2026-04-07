@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
+import SearchPalette from "./components/SearchPalette";
 import { ToastProvider } from "./components/Toast";
 import Dashboard from "./pages/Dashboard";
 import JournalList from "./pages/JournalList";
@@ -19,6 +20,19 @@ function App() {
     authenticated: boolean;
     loading: boolean;
   }>({ registered: false, authenticated: false, loading: true });
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  const handleSearchKeydown = useCallback((e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      e.preventDefault();
+      setSearchOpen((prev) => !prev);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleSearchKeydown);
+    return () => window.removeEventListener("keydown", handleSearchKeydown);
+  }, [handleSearchKeydown]);
 
   const checkAuth = async () => {
     try {
@@ -73,7 +87,8 @@ function App() {
     <BrowserRouter>
       <ToastProvider>
         <div className="min-h-screen bg-dark-bg text-light-text">
-          <Sidebar onLogout={handleLogout} />
+          <Sidebar onLogout={handleLogout} onSearchOpen={() => setSearchOpen(true)} />
+          <SearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
           <div className="pt-14 md:ml-48 md:pt-0">
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

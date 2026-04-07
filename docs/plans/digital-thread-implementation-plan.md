@@ -13,7 +13,7 @@ This plan builds toward that vision in six phases, each delivering standalone va
 - [Technology Decisions](#technology-decisions)
 - [Data Model Additions](#data-model-additions)
 - [Phase 1 — Entity Mentions & Backlinks ✅](#phase-1--entity-mentions--backlinks-)
-- [Phase 2 — Global Search](#phase-2--global-search)
+- [Phase 2 — Global Search ✅](#phase-2--global-search-)
 - [Phase 3 — Tags](#phase-3--tags)
 - [Phase 4 — Unified Timeline](#phase-4--unified-timeline)
 - [Phase 5 — Smart Suggestions & Contextual Previews](#phase-5--smart-suggestions--contextual-previews)
@@ -55,7 +55,7 @@ SQLite ships with FTS5 (Full-Text Search, version 5), a production-grade full-te
 For a single-user app with thousands (not millions) of documents, FTS5 delivers sub-millisecond search with zero infrastructure. No additional service, no RAM overhead, no API key.
 
 **FTS5 tables created:**
-- `search_index` — a single FTS5 virtual table indexing all entity types. Columns: `entity_type`, `entity_id`, `title`, `body`, `extra`. Kept in sync via application-level triggers (insert/update/delete hooks in the service layer).
+- `search_index` — a single FTS5 virtual table indexing all entity types (regular content mode, not external content). Columns: `entity_type`, `entity_id`, `title`, `body`, `extra`. Kept in sync via application-level hooks (insert/update/delete calls in the service layer).
 
 This avoids the complexity of per-table FTS tables and gives us cross-entity search from a single query.
 
@@ -123,10 +123,11 @@ CREATE VIRTUAL TABLE search_index USING fts5(
     title,
     body,
     extra,
-    content='',           -- external content mode (we manage sync)
     tokenize='porter unicode61'
 );
 ```
+
+> **Note:** The original plan specified `content=''` (external content mode) but the implementation uses regular content-storing mode. External content mode caused SELECT queries to return NULL for all content columns, making snippet extraction impossible. Regular mode stores a copy of the text in the FTS5 shadow tables, which is acceptable for this dataset size.
 
 - `entity_type`: `journal`, `goal`, `metric_type`, `exercise_type` (searchable, enables type filtering)
 - `entity_id`: not indexed, just carried through for result linking
@@ -263,7 +264,9 @@ CREATE VIRTUAL TABLE search_index USING fts5(
 
 ---
 
-## Phase 2 — Global Search
+## Phase 2 — Global Search ✅
+
+**Status:** Implemented (branch `main`)
 
 **Goal:** Search across all entity types from a single search bar. Find any journal entry, goal, metric type, or exercise type by keyword. This is the fastest way to pull on a thread — search "shoulder" and see your shoulder press PRs, journal entries about rehab, and your overhead press goal.
 
@@ -271,57 +274,25 @@ CREATE VIRTUAL TABLE search_index USING fts5(
 
 ---
 
-### Backend
+### Backend (Implemented)
 
-**FTS5 setup:**
+**Alembic migration:**
+- `backend/alembic/versions/a1b2c3d4e5f6_add_search_index_fts5.py`
+- Raw SQL (Alembic doesn't manage virtual tables natively)
+- Creates `search_index` FTS5 virtual table with regular content mode (NOT `content=''` external content — changed during implementation because external content mode caused SELECT to return NULLs, breaking snippet extraction)
 
-New Alembic migration (raw SQL — Alembic doesn't manage virtual tables natively):
+**Search service: `backend/app/services/search.py`**
 
-```python
-def upgrade():
-    op.execute("""
-        CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
-            entity_type,
-            entity_id UNINDEXED,
-            title,
-            body,
-            extra,
-            content='',
-            tokenize='porter unicode61'
-        );
-    """)
+- `_has_fts5(db)` — checks if the `search_index` table exists (graceful degradation if migration hasn't run)
+- `_get_rowid(db, entity_type, entity_id)` — finds existing row by entity_type + entity_id
+- `index_entity(db, entity_type, entity_id, title, body, extra)` — delete-then-insert upsert into FTS5 index
+- `remove_from_index(db, entity_type, entity_id)` — delete by rowid
+- `rebuild_index(db)` — clears entire index, then re-indexes all journals, goals, metric types, and exercise types
+- `search(db, query, entity_types, limit, offset)` — FTS5 MATCH with BM25 ranking (title=10x, body=1x, extra=0.5x), snippet extraction with `<mark>` tags, optional type filtering
+- `search_count(db, query, entity_types)` — count matching results for pagination
+- File uses `# ruff: noqa: S608` — the table name is a module-level constant, not user input
 
-def downgrade():
-    op.execute("DROP TABLE IF EXISTS search_index;")
-```
-
-**Search index sync: `backend/app/services/search.py`**
-
-```python
-def index_entity(db, entity_type: str, entity_id: str, title: str, body: str, extra: str = "") -> None:
-    """Insert or replace a document in the FTS5 index."""
-    # FTS5 external content mode: delete old row by rowid, insert new
-    ...
-
-def remove_from_index(db, entity_type: str, entity_id: str) -> None:
-    """Remove a document from the FTS5 index."""
-    ...
-
-def rebuild_index(db) -> None:
-    """Full rebuild — drop and re-index all entities. Used for import and maintenance."""
-    ...
-
-def search(db, query: str, entity_types: list[str] | None = None, limit: int = 20, offset: int = 0) -> list[dict]:
-    """Full-text search with BM25 ranking and optional type filtering.
-    Returns: [{entity_type, entity_id, title, snippet, rank}]
-    """
-    # Use FTS5 bm25() for ranking, snippet() for context extraction
-    # Weight title 10x over body: bm25(search_index, 0.0, 0.0, 10.0, 1.0, 0.5)
-    # Filter by entity_type if specified
-    ...
-```
-
-**Index sync hooks — add to every service's create/update/delete:**
+**Index sync hooks — in every service's create/update/delete:**
 
 | Entity | title | body | extra |
 |--------|-------|------|-------|
@@ -331,16 +302,18 @@ def search(db, query: str, entity_types: list[str] | None = None, limit: int = 2
 | exercise_type | name | "" | category, result_unit |
 
 Service layer changes (in `services/journal.py`, `services/goal.py`, `services/metric.py`, `services/result.py`):
-- After `create_*` → call `index_entity()`
-- After `update_*` → call `index_entity()` (upsert)
-- After `delete_*` → call `remove_from_index()`
+- After `create_*` → `db.flush()` then call `index_entity()` before `db.commit()`
+- After `update_*` → call `index_entity()` before `db.commit()`
+- Before `delete_*` → call `remove_from_index()` before `db.delete()`
 
 **Rebuild on import:**
-- After `import_json` completes, call `rebuild_index(db)` to ensure FTS5 is consistent with all imported data.
+- `services/export_import.py`: After `import_json` completes all entity inserts and mention syncs, calls `rebuild_index(db)` before final commit.
 
-**New endpoint:**
+**Endpoint (in `backend/app/routers/search.py`):**
 
-`GET /api/search?q=shoulder&types=journal,goal&limit=20&offset=0`
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/search` | Full-text search (`q`, `types`, `limit`, `offset`) |
 
 Response:
 ```json
@@ -353,104 +326,89 @@ Response:
       "title": "Shoulder rehab session",
       "snippet": "...worked on <mark>shoulder</mark> mobility drills and...",
       "rank": -4.52
-    },
-    {
-      "entity_type": "exercise_type",
-      "entity_id": "def-456",
-      "title": "Shoulder Press",
-      "snippet": "",
-      "rank": -8.11
     }
   ],
-  "total": 2
+  "total": 1
 }
 ```
 
-**Router:** New file `backend/app/routers/search.py`, mounted under `/api`.
-
-**Schemas:** New file `backend/app/schemas/search.py`:
+**Schemas (`backend/app/schemas/search.py`):**
 - `SearchResult`: entity_type, entity_id, title, snippet, rank
-- `SearchResponse`: query, results, total
+- `SearchResponse`: query, results (list[SearchResult]), total
 
 ---
 
-### Frontend
+### Frontend (Implemented)
 
-**Command palette search (`Ctrl+K` / `Cmd+K`):**
-
-New component: `SearchPalette.tsx`
-- Triggered by `Ctrl+K` (Windows/Linux) / `Cmd+K` (Mac) or clicking a search icon in the sidebar
-- Modal overlay with a text input at the top
+**Command palette search (`SearchPalette.tsx`):**
+- Triggered by `Cmd+K` (Mac) / `Ctrl+K` (Windows/Linux) via keydown listener in `App.tsx`, or by clicking search button in sidebar
+- Modal overlay with backdrop, text input at the top
 - Debounced search (300ms) calls `GET /api/search?q=...`
-- Results grouped by entity type with icons:
-  - 📓 Journal entries — link to `/journals` with entry expanded
-  - 🎯 Goals — link to `/goals` with goal expanded
-  - 📊 Metric types — link to `/metrics?type={id}`
-  - 🏋️ Exercise types — link to `/results?type={id}`
-- Keyboard navigable: arrow keys to move, Enter to select, Escape to close
-- Snippets shown with keyword highlighting (mark tags from FTS5)
-- Empty state: "No results for '{query}'"
-- No results yet state: "Start typing to search across all your health data"
+- Results listed with entity-type icons:
+  - 📓 Journal entries → `/journals/{id}`
+  - 🎯 Goals → `/goals`
+  - 📊 Metric types → `/metrics`
+  - 🏋️ Exercise types → `/results`
+- Keyboard navigable: ↑/↓ to move, Enter to select, Escape to close
+- Snippets rendered with `dangerouslySetInnerHTML` (contains FTS5 `<mark>` tags)
+- Empty state: "No results found" / placeholder: "Start typing to search across all your health data"
 
-**Sidebar addition:**
-- Add a search icon/button at the top of the sidebar that opens the search palette
-- Show the keyboard shortcut hint (`⌘K`) next to the icon
+**Sidebar addition (`Sidebar.tsx`):**
+- Search button with magnifying glass SVG icon and `⌘K` keyboard shortcut hint
+- `SidebarProps` extended with `onSearchOpen?: () => void`
 
-**New types:**
-- `frontend/src/types/search.ts`: `SearchResult`, `SearchResponse`
+**App integration (`App.tsx`):**
+- `searchOpen` state, `handleSearchKeydown` callback for Cmd+K/Ctrl+K toggle
+- `<SearchPalette open={searchOpen} onClose={...} />` rendered at root layout level
 
-**New API function:**
-- `frontend/src/api/search.ts`: `search(query, types?, limit?, offset?)`
+**New files:**
+- `frontend/src/types/search.ts` — `SearchResult`, `SearchResponse` interfaces
+- `frontend/src/api/search.ts` — `search(query, types?, limit?, offset?)` using URLSearchParams
 
 ---
 
-### CLI
+### CLI (Implemented)
 
-New command: `hs search <query> [--type journal|goal|metric|exercise] [--limit 20]`
+New command: `hs search <query> [--type/-t journal|goal|metric|exercise] [--limit/-l 20]`
 
-- Calls `GET /api/search?q=...`
+- File: `cli/health_studio_cli/commands/search.py`
+- Registered via `app.add_typer(search_app, name="search")` in `cli/health_studio_cli/main.py`
+- Type aliases: `metric` → `metric_type`, `exercise` → `exercise_type`
 - Renders results as a Rich table: Type | Title | Snippet
-- Color-coded by entity type
+- Color-coded by entity type: cyan=Journal, yellow=Goal, green=Metric, magenta=Exercise
 
 ---
 
-### Tests
+### Tests (Implemented)
 
-**Backend (pytest):**
-- `test_search.py`:
-  - `test_search_journal_by_title` — finds journal by title keyword
-  - `test_search_journal_by_content` — finds journal by body content
-  - `test_search_goal_by_title` — finds goal by title
-  - `test_search_exercise_type_by_name` — finds exercise type
-  - `test_search_metric_type_by_name` — finds metric type
-  - `test_search_stemming` — "running" matches entry with "run"
-  - `test_search_prefix` — "squat*" matches "squatting"
-  - `test_search_ranking` — title match ranks higher than body match
-  - `test_search_type_filter` — `types=journal` excludes goals
-  - `test_search_pagination` — offset/limit work correctly
-  - `test_search_empty_query` — returns empty results
-  - `test_search_no_results` — query with no matches returns empty
-  - `test_search_index_sync_on_create` — new entity appears in search
-  - `test_search_index_sync_on_update` — updated entity found by new content
-  - `test_search_index_sync_on_delete` — deleted entity disappears from search
-  - `test_search_rebuild_index` — full rebuild produces correct results
+**Backend — `backend/tests/test_search.py` (31 tests across 8 classes):**
+- `TestIndexEntity` (2) — index and find entity, index replaces on update
+- `TestRemoveFromIndex` (1) — remove entity from index
+- `TestRebuildIndex` (2) — indexes all entity types, clears stale entries
+- `TestSearch` (12) — by title, by content, goal, exercise, metric, stemming ("running" → "run"), prefix ("squat*"), ranking (title > body), type filter, pagination, empty query, no results
+- `TestSearchIndexSyncOnCreate` (4) — journal, goal, metric_type, exercise_type appear in search after API create
+- `TestSearchIndexSyncOnUpdate` (2) — journal, goal updated content found in search via API
+- `TestSearchIndexSyncOnDelete` (2) — journal, goal removed from search after API delete
+- `TestSearchEndpoint` (5) — returns results, type filter, empty query, pagination, requires auth
+- `TestSearchRebuildOnImport` (1) — import JSON triggers full index rebuild
 
-**Frontend (vitest):**
-- `Search.test.tsx`:
-  - Search palette opens on Cmd+K
-  - Search palette closes on Escape
-  - Results render grouped by type
-  - Selecting a result navigates to correct page
-  - Empty query shows placeholder text
-  - No results shows "no results" message
+**Frontend — `frontend/tests/Search.test.tsx` (7 tests):**
+- Renders when open, does not render when closed
+- Calls onClose on Escape
+- Shows results grouped by type
+- Shows no results message
+- Shows placeholder text before searching
+- Navigates to correct page when selecting a journal result
 
-**TDD order:**
-1. FTS5 migration + rebuild_index → test rebuild produces searchable content
-2. index_entity / remove_from_index → test sync on CRUD
-3. search() function → test ranking, filtering, pagination
-4. Search API endpoint → integration tests
-5. Frontend SearchPalette → component tests
-6. CLI `hs search` → mock API tests
+**Test infrastructure:**
+- `backend/tests/conftest.py`: `_create_fts5_tables(engine)` and `_drop_fts5_tables(engine)` added to `_setup_db` fixture (SQLAlchemy `create_all` doesn't handle FTS5 virtual tables)
+
+---
+
+### Export/Import Impact (Implemented)
+
+- Export does **not** include the FTS5 index — it is derived data
+- On JSON import, after all entities are committed and mentions synced, `rebuild_index(db)` re-indexes everything
 
 ---
 

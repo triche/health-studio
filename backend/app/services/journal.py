@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 
 from app.models.journal import JournalEntry
 from app.services.mentions import sync_mentions
+from app.services.search import index_entity, remove_from_index
 
 if TYPE_CHECKING:
     from datetime import date
@@ -24,6 +25,7 @@ def create_journal(db: Session, data: JournalCreate) -> JournalEntry:
     db.add(entry)
     db.flush()
     sync_mentions(db, entry.id, data.content)
+    index_entity(db, "journal", entry.id, data.title, data.content, str(data.entry_date))
     db.commit()
     db.refresh(entry)
     return entry
@@ -69,6 +71,7 @@ def update_journal(db: Session, journal_id: str, data: JournalUpdate) -> Journal
     # Re-sync mentions if content changed
     if "content" in update_data:
         sync_mentions(db, entry.id, entry.content)
+    index_entity(db, "journal", entry.id, entry.title, entry.content, str(entry.entry_date))
     db.commit()
     db.refresh(entry)
     return entry
@@ -76,5 +79,6 @@ def update_journal(db: Session, journal_id: str, data: JournalUpdate) -> Journal
 
 def delete_journal(db: Session, journal_id: str) -> None:
     entry = get_journal(db, journal_id)
+    remove_from_index(db, "journal", entry.id)
     db.delete(entry)
     db.commit()

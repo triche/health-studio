@@ -10,6 +10,7 @@ A local-first personal health dashboard, journal, and tracker. Consolidates ment
 - **Goals** — Set goals linked to metrics or exercises with progress tracking and Markdown plans
 - **Dashboard** — Aggregated overview of recent activity, active goals, latest metrics, and recent PRs
 - **Digital Thread** — Link journal entries to goals, metrics, and exercises with `[[type:name]]` mentions; autocomplete on `[[`, rendered as styled pills, with backlinks shown on entity pages
+- **Global Search** — Full-text search across all entity types via `Cmd+K` command palette; FTS5-powered with BM25 ranking, Porter stemming, prefix queries, and type filtering
 - **Dark/Light mode** — Toggle between themes; preference persisted in localStorage
 - **Responsive layout** — Collapsible sidebar for mobile; full sidebar on desktop
 - **CLI** — Full-featured command-line interface (`hs`) for managing data from the terminal
@@ -109,6 +110,8 @@ hs results list             # List exercise types
 hs results log <type> <val> # Log a result
 hs goals list               # List goals
 hs goals create             # Create a goal
+hs search <query>           # Search across all data
+hs search <query> -t goal   # Search filtered by type
 ```
 
 ## API Reference
@@ -186,6 +189,11 @@ All endpoints are prefixed with `/api`. Authentication is required for all endpo
 | GET | `/api/goals/{id}/backlinks` | Journals referencing a goal |
 | GET | `/api/metric-types/{id}/backlinks` | Journals referencing a metric |
 | GET | `/api/exercise-types/{id}/backlinks` | Journals referencing an exercise |
+
+### Search
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/search` | Full-text search (`q`, `types`, `limit`, `offset` params) |
 
 ### Export / Import
 | Method | Path | Description |

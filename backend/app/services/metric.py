@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 
 from app.models.metric import MetricEntry, MetricType
+from app.services.search import index_entity, remove_from_index
 
 if TYPE_CHECKING:
     from datetime import date
@@ -34,6 +35,8 @@ def create_metric_type(db: Session, data: MetricTypeCreate) -> MetricType:
         )
     mt = MetricType(name=data.name, unit=data.unit)
     db.add(mt)
+    db.flush()
+    index_entity(db, "metric_type", mt.id, data.name, "", data.unit or "")
     db.commit()
     db.refresh(mt)
     return mt
@@ -67,6 +70,7 @@ def update_metric_type(db: Session, metric_type_id: str, data: MetricTypeUpdate)
             )
     for key, value in update_data.items():
         setattr(mt, key, value)
+    index_entity(db, "metric_type", mt.id, mt.name, "", mt.unit or "")
     db.commit()
     db.refresh(mt)
     return mt
@@ -74,6 +78,7 @@ def update_metric_type(db: Session, metric_type_id: str, data: MetricTypeUpdate)
 
 def delete_metric_type(db: Session, metric_type_id: str) -> None:
     mt = get_metric_type(db, metric_type_id)
+    remove_from_index(db, "metric_type", mt.id)
     db.delete(mt)
     db.commit()
 
