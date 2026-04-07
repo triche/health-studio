@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from fastapi import HTTPException, status
 
 from app.models.journal import JournalEntry
+from app.services.mentions import sync_mentions
 
 if TYPE_CHECKING:
     from datetime import date
@@ -21,6 +22,8 @@ def create_journal(db: Session, data: JournalCreate) -> JournalEntry:
         entry_date=data.entry_date,
     )
     db.add(entry)
+    db.flush()
+    sync_mentions(db, entry.id, data.content)
     db.commit()
     db.refresh(entry)
     return entry
@@ -63,6 +66,9 @@ def update_journal(db: Session, journal_id: str, data: JournalUpdate) -> Journal
     update_data = data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(entry, key, value)
+    # Re-sync mentions if content changed
+    if "content" in update_data:
+        sync_mentions(db, entry.id, entry.content)
     db.commit()
     db.refresh(entry)
     return entry

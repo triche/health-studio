@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import MDEditor, { commands } from "@uiw/react-md-editor";
+import MentionAutocomplete from "./MentionAutocomplete";
 
 interface MarkdownEditorProps {
   value: string;
@@ -39,6 +40,7 @@ export default function MarkdownEditor({
   const [colorMode, setColorMode] = useState<"light" | "dark">(() =>
     document.documentElement.classList.contains("dark") ? "dark" : "light",
   );
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -51,8 +53,15 @@ export default function MarkdownEditor({
     return () => observer.disconnect();
   }, []);
 
+  const handleInsert = useCallback(
+    (before: string, mention: string, after: string) => {
+      onChange(before + mention + after);
+    },
+    [onChange],
+  );
+
   return (
-    <div data-color-mode={colorMode}>
+    <div data-color-mode={colorMode} ref={containerRef} className="relative">
       <MDEditor
         value={value}
         onChange={(val) => onChange(val ?? "")}
@@ -62,6 +71,7 @@ export default function MarkdownEditor({
         preview="edit"
         data-testid={testId}
       />
+      <MentionAutocomplete containerRef={containerRef} value={value} onInsert={handleInsert} />
     </div>
   );
 }

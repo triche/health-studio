@@ -11,6 +11,7 @@ import {
   getMetricTrend,
 } from "../api/metrics";
 import type { MetricType, MetricEntry, TrendResponse } from "../types/metric";
+import Backlinks from "../components/Backlinks";
 
 export default function Metrics() {
   const [types, setTypes] = useState<MetricType[]>([]);
@@ -551,6 +552,9 @@ export default function Metrics() {
           )}
         </>
       )}
+
+      {/* Backlinks */}
+      {selectedTypeId && <Backlinks entityType="metric_type" entityId={selectedTypeId} />}
     </div>
   );
 }
