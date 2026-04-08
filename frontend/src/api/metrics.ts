@@ -9,8 +9,11 @@ import type {
   TrendResponse,
 } from "../types/metric";
 
-export function listMetricTypes(): Promise<MetricType[]> {
-  return api.get<MetricType[]>("/api/metric-types");
+export function listMetricTypes(params?: { tag?: string }): Promise<MetricType[]> {
+  const search = new URLSearchParams();
+  if (params?.tag) search.set("tag", params.tag);
+  const qs = search.toString();
+  return api.get<MetricType[]>(`/api/metric-types${qs ? `?${qs}` : ""}`);
 }
 
 export function createMetricType(data: MetricTypeCreate): Promise<MetricType> {

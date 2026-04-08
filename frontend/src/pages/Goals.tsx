@@ -9,6 +9,8 @@ import type { MetricType } from "../types/metric";
 import type { ExerciseType } from "../types/result";
 import MarkdownEditor from "../components/MarkdownEditor";
 import Backlinks from "../components/Backlinks";
+import TagInput from "../components/TagInput";
+import TagList from "../components/TagList";
 
 export default function Goals() {
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -30,6 +32,7 @@ export default function Goals() {
   const [startValue, setStartValue] = useState("");
   const [lowerIsBetter, setLowerIsBetter] = useState(false);
   const [deadline, setDeadline] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
 
   // Time entry state
   const [targetHours, setTargetHours] = useState("");
@@ -84,6 +87,7 @@ export default function Goals() {
     setStartHours("");
     setStartMinutes("");
     setStartSeconds("");
+    setTags([]);
     setEditingGoal(null);
     setShowForm(false);
   };
@@ -146,6 +150,7 @@ export default function Goals() {
             : resolvedStart,
           lower_is_better: lowerIsBetter,
           deadline: deadline || undefined,
+          tags,
         });
       } else {
         const data: GoalCreate = {
@@ -161,6 +166,7 @@ export default function Goals() {
           if (startHours || startMinutes || startSeconds) data.start_value = resolvedStart!;
         } else if (startValue) data.start_value = parseFloat(startValue);
         if (deadline) data.deadline = deadline;
+        if (tags.length > 0) data.tags = tags;
         await createGoal(data);
       }
       resetForm();
@@ -179,6 +185,7 @@ export default function Goals() {
     setTargetId(goal.target_id);
     setLowerIsBetter(goal.lower_is_better);
     setDeadline(goal.deadline || "");
+    setTags(goal.tags || []);
 
     const timeMode = getTimeModeForGoal(goal);
     if (timeMode === "seconds") {
@@ -572,6 +579,10 @@ export default function Goals() {
               Check this for goals where the number should go down (e.g. body weight, time)
             </p>
           </div>
+          <div className="mb-3">
+            <label className="mb-1 block text-sm text-light-text/70">Tags</label>
+            <TagInput tags={tags} onChange={setTags} />
+          </div>
           <div className="flex gap-2">
             <button
               type="submit"
@@ -703,6 +714,11 @@ export default function Goals() {
               )}
 
               {/* Backlinks */}
+              {goal.tags && goal.tags.length > 0 && (
+                <div className="mt-2">
+                  <TagList tags={goal.tags} baseUrl="/goals" />
+                </div>
+              )}
               {expandedPlans.has(goal.id) && <Backlinks entityType="goal" entityId={goal.id} />}
             </div>
           ))}

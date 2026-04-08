@@ -9,12 +9,14 @@ class JournalCreate(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     content: str = ""
     entry_date: date
+    tags: list[str] | None = None
 
 
 class JournalUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=500)
     content: str | None = None
     entry_date: date | None = None
+    tags: list[str] | None = None
 
 
 class JournalResponse(BaseModel):
@@ -22,6 +24,7 @@ class JournalResponse(BaseModel):
     title: str
     content: str
     entry_date: date
+    tags: list[str] = []
     created_at: datetime
     updated_at: datetime
 

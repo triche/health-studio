@@ -12,6 +12,8 @@ import {
 } from "../api/results";
 import type { ExerciseType, ResultEntry, ResultTrendResponse } from "../types/result";
 import Backlinks from "../components/Backlinks";
+import TagInput from "../components/TagInput";
+import TagList from "../components/TagList";
 
 export default function Results() {
   const [types, setTypes] = useState<ExerciseType[]>([]);
@@ -25,6 +27,7 @@ export default function Results() {
   const [newTypeName, setNewTypeName] = useState("");
   const [newTypeCategory, setNewTypeCategory] = useState("custom");
   const [newTypeUnit, setNewTypeUnit] = useState("lbs");
+  const [newTypeTags, setNewTypeTags] = useState<string[]>([]);
   const [showManage, setShowManage] = useState(false);
 
   // New entry form
@@ -93,12 +96,14 @@ export default function Results() {
         name: newTypeName,
         category: newTypeCategory,
         result_unit: newTypeUnit,
+        tags: newTypeTags.length > 0 ? newTypeTags : undefined,
       });
       setTypes((prev) => [...prev, created]);
       setSelectedTypeId(created.id);
       setNewTypeName("");
       setNewTypeCategory("custom");
       setNewTypeUnit("lbs");
+      setNewTypeTags([]);
       setShowManage(false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create exercise type");
@@ -278,42 +283,45 @@ export default function Results() {
                 ))}
               </div>
             )}
-            <form onSubmit={handleCreateType} className="flex gap-2">
-              <input
-                type="text"
-                value={newTypeName}
-                onChange={(e) => setNewTypeName(e.target.value)}
-                placeholder="Name (e.g. Back Squat)"
-                required
-                className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
-              />
-              <select
-                value={newTypeCategory}
-                onChange={(e) => setNewTypeCategory(e.target.value)}
-                className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
-              >
-                <option value="olympic_lift">Olympic Lift</option>
-                <option value="power_lift">Power Lift</option>
-                <option value="crossfit_benchmark">CrossFit Benchmark</option>
-                <option value="running">Running</option>
-                <option value="custom">Custom</option>
-              </select>
-              <select
-                value={newTypeUnit}
-                onChange={(e) => setNewTypeUnit(e.target.value)}
-                className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
-              >
-                <option value="lbs">lbs</option>
-                <option value="reps">reps</option>
-                <option value="seconds">seconds</option>
-                <option value="time">time</option>
-              </select>
-              <button
-                type="submit"
-                className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
-              >
-                Create
-              </button>
+            <form onSubmit={handleCreateType} className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newTypeName}
+                  onChange={(e) => setNewTypeName(e.target.value)}
+                  placeholder="Name (e.g. Back Squat)"
+                  required
+                  className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
+                />
+                <select
+                  value={newTypeCategory}
+                  onChange={(e) => setNewTypeCategory(e.target.value)}
+                  className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
+                >
+                  <option value="olympic_lift">Olympic Lift</option>
+                  <option value="power_lift">Power Lift</option>
+                  <option value="crossfit_benchmark">CrossFit Benchmark</option>
+                  <option value="running">Running</option>
+                  <option value="custom">Custom</option>
+                </select>
+                <select
+                  value={newTypeUnit}
+                  onChange={(e) => setNewTypeUnit(e.target.value)}
+                  className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
+                >
+                  <option value="lbs">lbs</option>
+                  <option value="reps">reps</option>
+                  <option value="seconds">seconds</option>
+                  <option value="time">time</option>
+                </select>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
+                >
+                  Create
+                </button>
+              </div>
+              <TagInput tags={newTypeTags} onChange={setNewTypeTags} />
             </form>
           </div>
         )}
@@ -323,6 +331,11 @@ export default function Results() {
         <p className="text-light-text/60">No exercise types. Add one to get started!</p>
       ) : (
         <>
+          {selectedType.tags && selectedType.tags.length > 0 && (
+            <div className="mb-3">
+              <TagList tags={selectedType.tags} baseUrl="/results" />
+            </div>
+          )}
           {/* Trend chart */}
           {trend && trend.data.length > 0 && (
             <>

@@ -8,6 +8,7 @@ const links = [
   { to: "/metrics", label: "Metrics" },
   { to: "/results", label: "Results" },
   { to: "/goals", label: "Goals" },
+  { to: "/tags", label: "Tags" },
 ];
 
 interface SidebarProps {

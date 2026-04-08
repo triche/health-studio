@@ -28,11 +28,16 @@ def _handle_error(e: Exception) -> None:
 
 
 @app.command()
-def types() -> None:
+def types(
+    tag: str | None = typer.Option(None, help="Filter by tag"),
+) -> None:
     """List available metric types."""
     with get_client() as client:
+        params: dict = {}
+        if tag:
+            params["tag"] = tag
         try:
-            response = client.get("/api/metric-types")
+            response = client.get("/api/metric-types", params=params)
             response.raise_for_status()
         except Exception as e:
             _handle_error(e)

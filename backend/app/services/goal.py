@@ -8,6 +8,7 @@ from app.models.goal import Goal
 from app.models.metric import MetricEntry
 from app.models.result import ResultEntry
 from app.services.search import index_entity, remove_from_index
+from app.services.tags import delete_entity_tags, get_tags, sync_tags
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -82,7 +83,7 @@ def _compute_progress(
 
 
 def _enrich_goal(db: Session, goal: Goal) -> Goal:
-    """Update goal's current_value dynamically and add progress attribute."""
+    """Update goal's current_value dynamically and add progress + tags attributes."""
     goal.current_value = _compute_current_value(db, goal)
     goal.progress = _compute_progress(  # type: ignore[attr-defined]
         goal.current_value,
@@ -90,6 +91,7 @@ def _enrich_goal(db: Session, goal: Goal) -> Goal:
         lower_is_better=goal.lower_is_better,
         start_value=goal.start_value,
     )
+    goal.tags = get_tags(db, "goal", goal.id)  # type: ignore[attr-defined]
     return goal
 
 
@@ -113,12 +115,16 @@ def create_goal(db: Session, data: GoalCreate) -> Goal:
     )
     db.add(goal)
     db.flush()
+    if data.tags is not None:
+        sync_tags(db, "goal", goal.id, data.tags)
     body = "\n".join(filter(None, [data.description, data.plan]))
     extra_parts = [data.status or ""]
     if data.target_type:
         extra_parts.append(data.target_type)
     if data.deadline:
         extra_parts.append(str(data.deadline))
+    if data.tags:
+        extra_parts.extend(data.tags)
     index_entity(db, "goal", goal.id, data.title, body, " ".join(extra_parts))
     db.commit()
     db.refresh(goal)
@@ -138,11 +144,23 @@ def list_goals(
     page: int = 1,
     per_page: int = 20,
     goal_status: str | None = None,
+    tag: str | None = None,
 ) -> tuple[list[Goal], int]:
+    from app.models.tag import EntityTag
+
     query = db.query(Goal)
 
     if goal_status is not None:
         query = query.filter(Goal.status == goal_status)
+    if tag is not None:
+        query = query.filter(
+            Goal.id.in_(
+                db.query(EntityTag.entity_id).filter(
+                    EntityTag.entity_type == "goal",
+                    EntityTag.tag == tag.strip().lower(),
+                )
+            )
+        )
 
     total = query.count()
     items = (
@@ -156,14 +174,19 @@ def update_goal(db: Session, goal_id: str, data: GoalUpdate) -> Goal:
     if goal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
     update_data = data.model_dump(exclude_unset=True)
+    tags = update_data.pop("tags", None)
     for key, value in update_data.items():
         setattr(goal, key, value)
+    if tags is not None:
+        sync_tags(db, "goal", goal.id, tags)
     body = "\n".join(filter(None, [goal.description, goal.plan]))
     extra_parts = [goal.status or ""]
     if goal.target_type:
         extra_parts.append(goal.target_type)
     if goal.deadline:
         extra_parts.append(str(goal.deadline))
+    tag_list = get_tags(db, "goal", goal.id)
+    extra_parts.extend(tag_list)
     index_entity(db, "goal", goal.id, goal.title, body, " ".join(extra_parts))
     db.commit()
     db.refresh(goal)
@@ -175,5 +198,6 @@ def delete_goal(db: Session, goal_id: str) -> None:
     if goal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Goal not found")
     remove_from_index(db, "goal", goal.id)
+    delete_entity_tags(db, "goal", goal.id)
     db.delete(goal)
     db.commit()

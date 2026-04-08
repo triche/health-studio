@@ -23,10 +23,11 @@ def list_journals(
     per_page: int = Query(20, ge=1, le=100),
     date_from: date | None = None,
     date_to: date | None = None,
+    tag: str | None = None,
     db: Session = Depends(get_db),
 ):
     items, total = journal_service.list_journals(
-        db, page=page, per_page=per_page, date_from=date_from, date_to=date_to
+        db, page=page, per_page=per_page, date_from=date_from, date_to=date_to, tag=tag
     )
     return JournalListResponse(items=items, total=total, page=page, per_page=per_page)
 

@@ -11,12 +11,14 @@ class ExerciseTypeCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     category: str = Field(min_length=1, max_length=100)
     result_unit: str = Field(min_length=1, max_length=50)
+    tags: list[str] | None = None
 
 
 class ExerciseTypeUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     category: str | None = Field(default=None, min_length=1, max_length=100)
     result_unit: str | None = Field(default=None, min_length=1, max_length=50)
+    tags: list[str] | None = None
 
 
 class ExerciseTypeResponse(BaseModel):
@@ -24,6 +26,7 @@ class ExerciseTypeResponse(BaseModel):
     name: str
     category: str
     result_unit: str
+    tags: list[str] = []
     created_at: datetime
 
     model_config = {"from_attributes": True}

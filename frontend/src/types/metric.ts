@@ -2,6 +2,7 @@ export interface MetricType {
   id: string;
   name: string;
   unit: string;
+  tags: string[];
   created_at: string;
 }
 
@@ -37,6 +38,7 @@ export interface MetricEntryUpdate {
 export interface MetricTypeCreate {
   name: string;
   unit: string;
+  tags?: string[];
 }
 
 export interface TrendPoint {

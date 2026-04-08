@@ -5,6 +5,7 @@ from app.models.journal import JournalEntry
 from app.models.mention import EntityMention
 from app.models.metric import MetricEntry, MetricType
 from app.models.result import ExerciseType, ResultEntry
+from app.models.tag import EntityTag
 from app.models.user import User
 
 __all__ = [
@@ -15,6 +16,7 @@ __all__ = [
     "AuthRateLimit",
     "JournalEntry",
     "EntityMention",
+    "EntityTag",
     "MetricType",
     "MetricEntry",
     "ExerciseType",

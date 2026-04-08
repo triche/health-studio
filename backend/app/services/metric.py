@@ -7,6 +7,7 @@ from sqlalchemy import func
 
 from app.models.metric import MetricEntry, MetricType
 from app.services.search import index_entity, remove_from_index
+from app.services.tags import delete_entity_tags, get_tags, sync_tags
 
 if TYPE_CHECKING:
     from datetime import date
@@ -26,6 +27,12 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
+def _attach_tags(db: Session, mt: MetricType) -> MetricType:
+    """Attach tags list to metric type for serialization."""
+    mt.tags = get_tags(db, "metric_type", mt.id)  # type: ignore[attr-defined]
+    return mt
+
+
 def create_metric_type(db: Session, data: MetricTypeCreate) -> MetricType:
     existing = db.query(MetricType).filter(func.lower(MetricType.name) == data.name.lower()).first()
     if existing:
@@ -36,26 +43,46 @@ def create_metric_type(db: Session, data: MetricTypeCreate) -> MetricType:
     mt = MetricType(name=data.name, unit=data.unit)
     db.add(mt)
     db.flush()
-    index_entity(db, "metric_type", mt.id, data.name, "", data.unit or "")
+    if data.tags is not None:
+        sync_tags(db, "metric_type", mt.id, data.tags)
+    extra_parts = [data.unit or ""]
+    if data.tags:
+        extra_parts.extend(data.tags)
+    index_entity(db, "metric_type", mt.id, data.name, "", " ".join(extra_parts))
     db.commit()
     db.refresh(mt)
-    return mt
+    return _attach_tags(db, mt)
 
 
 def get_metric_type(db: Session, metric_type_id: str) -> MetricType:
     mt = db.get(MetricType, metric_type_id)
     if mt is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Metric type not found")
-    return mt
+    return _attach_tags(db, mt)
 
 
-def list_metric_types(db: Session) -> list[MetricType]:
-    return db.query(MetricType).order_by(MetricType.name).all()
+def list_metric_types(db: Session, *, tag: str | None = None) -> list[MetricType]:
+    from app.models.tag import EntityTag
+
+    query = db.query(MetricType)
+    if tag is not None:
+        query = query.filter(
+            MetricType.id.in_(
+                db.query(EntityTag.entity_id).filter(
+                    EntityTag.entity_type == "metric_type",
+                    EntityTag.tag == tag.strip().lower(),
+                )
+            )
+        )
+    return [_attach_tags(db, mt) for mt in query.order_by(MetricType.name).all()]
 
 
 def update_metric_type(db: Session, metric_type_id: str, data: MetricTypeUpdate) -> MetricType:
-    mt = get_metric_type(db, metric_type_id)
+    mt = db.get(MetricType, metric_type_id)
+    if mt is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Metric type not found")
     update_data = data.model_dump(exclude_unset=True)
+    tags = update_data.pop("tags", None)
     if "name" in update_data:
         existing = (
             db.query(MetricType)
@@ -70,15 +97,23 @@ def update_metric_type(db: Session, metric_type_id: str, data: MetricTypeUpdate)
             )
     for key, value in update_data.items():
         setattr(mt, key, value)
-    index_entity(db, "metric_type", mt.id, mt.name, "", mt.unit or "")
+    if tags is not None:
+        sync_tags(db, "metric_type", mt.id, tags)
+    tag_list = get_tags(db, "metric_type", mt.id)
+    extra_parts = [mt.unit or ""]
+    extra_parts.extend(tag_list)
+    index_entity(db, "metric_type", mt.id, mt.name, "", " ".join(extra_parts))
     db.commit()
     db.refresh(mt)
-    return mt
+    return _attach_tags(db, mt)
 
 
 def delete_metric_type(db: Session, metric_type_id: str) -> None:
-    mt = get_metric_type(db, metric_type_id)
+    mt = db.get(MetricType, metric_type_id)
+    if mt is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Metric type not found")
     remove_from_index(db, "metric_type", mt.id)
+    delete_entity_tags(db, "metric_type", mt.id)
     db.delete(mt)
     db.commit()
 

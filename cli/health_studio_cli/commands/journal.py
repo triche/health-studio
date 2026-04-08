@@ -39,12 +39,15 @@ def _handle_error(e: Exception) -> None:
 def list_entries(
     since: str | None = typer.Option(None, help="Filter entries from this date (YYYY-MM-DD)"),
     limit: int = typer.Option(20, help="Maximum number of entries to return"),
+    tag: str | None = typer.Option(None, help="Filter by tag"),
 ) -> None:
     """List journal entries."""
     with get_client() as client:
         params: dict = {"per_page": limit}
         if since:
             params["date_from"] = since
+        if tag:
+            params["tag"] = tag
         try:
             response = client.get("/api/journals", params=params)
             response.raise_for_status()
@@ -89,6 +92,9 @@ def show(journal_id: str = typer.Argument(..., help="Journal entry ID")) -> None
 
         entry = response.json()
         console.print(f"\n[bold]{entry['title']}[/bold]  [dim]{entry['entry_date']}[/dim]\n")
+        tags = entry.get("tags", [])
+        if tags:
+            console.print(f"  Tags: {', '.join(tags)}\n")
         print_markdown(entry["content"])
 
 

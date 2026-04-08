@@ -6,6 +6,7 @@ import rehypeSanitize from "rehype-sanitize";
 import { listJournals, deleteJournal } from "../api/journals";
 import type { JournalEntry } from "../types/journal";
 import { renderMentions } from "../components/MentionRenderer";
+import TagList from "../components/TagList";
 import type { ReactNode } from "react";
 
 function renderMentionsInChildren(children: ReactNode): ReactNode {
@@ -24,12 +25,15 @@ export default function JournalList() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const page = Number(searchParams.get("page") ?? "1");
+  const tagFilter = searchParams.get("tag") ?? "";
   const perPage = 20;
 
   useEffect(() => {
     setLoading(true);
     setError(null);
-    listJournals({ page, per_page: perPage })
+    const params: { page: number; per_page: number; tag?: string } = { page, per_page: perPage };
+    if (tagFilter) params.tag = tagFilter;
+    listJournals(params)
       .then((data) => {
         setEntries(data.items);
         setTotal(data.total);
@@ -38,7 +42,7 @@ export default function JournalList() {
         setError(err instanceof Error ? err.message : "Failed to load journals");
       })
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [page, tagFilter]);
 
   const totalPages = Math.ceil(total / perPage);
 
@@ -64,6 +68,18 @@ export default function JournalList() {
         </Link>
       </div>
 
+      {tagFilter && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-light-text/60">
+          Filtered by tag:{" "}
+          <span className="rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
+            {tagFilter}
+          </span>
+          <button onClick={() => setSearchParams({})} className="text-primary hover:underline">
+            Clear
+          </button>
+        </div>
+      )}
+
       {error && <div className="mb-4 rounded-lg bg-red-900/50 p-3 text-red-200">{error}</div>}
 
       {loading ? (
@@ -82,6 +98,11 @@ export default function JournalList() {
                   >
                     <h2 className="truncate text-lg font-semibold">{entry.title}</h2>
                     <p className="text-sm text-light-text/60">{entry.entry_date}</p>
+                    {entry.tags && entry.tags.length > 0 && (
+                      <div className="mt-1">
+                        <TagList tags={entry.tags} baseUrl="/journals" />
+                      </div>
+                    )}
                   </Link>
                   <div className="ml-4 flex items-center gap-3">
                     <button

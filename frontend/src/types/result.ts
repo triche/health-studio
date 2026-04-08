@@ -3,6 +3,7 @@ export interface ExerciseType {
   name: string;
   category: string;
   result_unit: string;
+  tags: string[];
   created_at: string;
 }
 
@@ -29,6 +30,7 @@ export interface ExerciseTypeCreate {
   name: string;
   category: string;
   result_unit: string;
+  tags?: string[];
 }
 
 export interface ResultEntryCreate {

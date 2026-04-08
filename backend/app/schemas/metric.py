@@ -10,17 +10,20 @@ from pydantic import BaseModel, Field
 class MetricTypeCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     unit: str = Field(min_length=1, max_length=50)
+    tags: list[str] | None = None
 
 
 class MetricTypeUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     unit: str | None = Field(default=None, min_length=1, max_length=50)
+    tags: list[str] | None = None
 
 
 class MetricTypeResponse(BaseModel):
     id: str
     name: str
     unit: str
+    tags: list[str] = []
     created_at: datetime
 
     model_config = {"from_attributes": True}

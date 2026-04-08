@@ -287,6 +287,7 @@ describe("JournalEdit", () => {
         title: "Test",
         content: "Body",
         entry_date: expect.any(String),
+        tags: [],
       });
     });
 
@@ -337,6 +338,7 @@ describe("JournalEdit", () => {
         title: "Updated",
         content: "Old content",
         entry_date: "2025-01-15",
+        tags: [],
       });
     });
   });

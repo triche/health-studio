@@ -9,8 +9,11 @@ import type {
   ResultTrendResponse,
 } from "../types/result";
 
-export function listExerciseTypes(): Promise<ExerciseType[]> {
-  return api.get<ExerciseType[]>("/api/exercise-types");
+export function listExerciseTypes(params?: { tag?: string }): Promise<ExerciseType[]> {
+  const search = new URLSearchParams();
+  if (params?.tag) search.set("tag", params.tag);
+  const qs = search.toString();
+  return api.get<ExerciseType[]>(`/api/exercise-types${qs ? `?${qs}` : ""}`);
 }
 
 export function createExerciseType(data: ExerciseTypeCreate): Promise<ExerciseType> {

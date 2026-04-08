@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { getJournal, createJournal, updateJournal } from "../api/journals";
 import type { JournalEntry } from "../types/journal";
 import MarkdownEditor from "../components/MarkdownEditor";
+import TagInput from "../components/TagInput";
 
 export default function JournalEdit() {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +19,7 @@ export default function JournalEdit() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
   const [error, setError] = useState<string | null>(null);
+  const [tags, setTags] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isNew && id) {
@@ -27,6 +29,7 @@ export default function JournalEdit() {
           setTitle(entry.title);
           setContent(entry.content);
           setEntryDate(entry.entry_date);
+          setTags(entry.tags || []);
         })
         .catch((err: unknown) => {
           setError(err instanceof Error ? err.message : "Failed to load entry");
@@ -42,9 +45,9 @@ export default function JournalEdit() {
 
     try {
       if (isNew) {
-        await createJournal({ title, content, entry_date: entryDate });
+        await createJournal({ title, content, entry_date: entryDate, tags });
       } else {
-        await updateJournal(id!, { title, content, entry_date: entryDate });
+        await updateJournal(id!, { title, content, entry_date: entryDate, tags });
       }
       navigate("/journals");
     } catch (err: unknown) {
@@ -101,6 +104,11 @@ export default function JournalEdit() {
             Content (Markdown)
           </label>
           <MarkdownEditor value={content} onChange={setContent} height={300} />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-light-text">Tags</label>
+          <TagInput tags={tags} onChange={setTags} />
         </div>
 
         <div className="flex gap-3">

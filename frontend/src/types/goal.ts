@@ -12,6 +12,7 @@ export interface Goal {
   status: string;
   deadline: string | null;
   progress: number;
+  tags: string[];
   created_at: string;
   updated_at: string;
 }
@@ -34,6 +35,7 @@ export interface GoalCreate {
   lower_is_better?: boolean;
   status?: string;
   deadline?: string;
+  tags?: string[];
 }
 
 export interface GoalUpdate {
@@ -47,4 +49,5 @@ export interface GoalUpdate {
   lower_is_better?: boolean;
   status?: string;
   deadline?: string | null;
+  tags?: string[];
 }
