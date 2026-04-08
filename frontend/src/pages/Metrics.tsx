@@ -12,6 +12,8 @@ import {
 } from "../api/metrics";
 import type { MetricType, MetricEntry, TrendResponse } from "../types/metric";
 import Backlinks from "../components/Backlinks";
+import TagInput from "../components/TagInput";
+import TagList from "../components/TagList";
 
 export default function Metrics() {
   const [types, setTypes] = useState<MetricType[]>([]);
@@ -24,6 +26,7 @@ export default function Metrics() {
   // New type form
   const [newTypeName, setNewTypeName] = useState("");
   const [newTypeUnit, setNewTypeUnit] = useState("");
+  const [newTypeTags, setNewTypeTags] = useState<string[]>([]);
   const [showManage, setShowManage] = useState(false);
 
   // New entry form
@@ -86,11 +89,16 @@ export default function Metrics() {
     e.preventDefault();
     setError(null);
     try {
-      const created = await createMetricType({ name: newTypeName, unit: newTypeUnit });
+      const created = await createMetricType({
+        name: newTypeName,
+        unit: newTypeUnit,
+        tags: newTypeTags.length > 0 ? newTypeTags : undefined,
+      });
       setTypes((prev) => [...prev, created]);
       setSelectedTypeId(created.id);
       setNewTypeName("");
       setNewTypeUnit("");
+      setNewTypeTags([]);
       setShowManage(false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create metric type");
@@ -277,29 +285,32 @@ export default function Metrics() {
                 ))}
               </div>
             )}
-            <form onSubmit={handleCreateType} className="flex gap-2">
-              <input
-                type="text"
-                value={newTypeName}
-                onChange={(e) => setNewTypeName(e.target.value)}
-                placeholder="Name (e.g. Weight)"
-                required
-                className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
-              />
-              <input
-                type="text"
-                value={newTypeUnit}
-                onChange={(e) => setNewTypeUnit(e.target.value)}
-                placeholder="Unit (e.g. lbs)"
-                required
-                className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
-              >
-                Create
-              </button>
+            <form onSubmit={handleCreateType} className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newTypeName}
+                  onChange={(e) => setNewTypeName(e.target.value)}
+                  placeholder="Name (e.g. Weight)"
+                  required
+                  className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
+                />
+                <input
+                  type="text"
+                  value={newTypeUnit}
+                  onChange={(e) => setNewTypeUnit(e.target.value)}
+                  placeholder="Unit (e.g. lbs)"
+                  required
+                  className="rounded-lg border border-gray-600 bg-dark-surface px-3 py-1.5 text-sm text-light-text focus:border-primary focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600"
+                >
+                  Create
+                </button>
+              </div>
+              <TagInput tags={newTypeTags} onChange={setNewTypeTags} />
             </form>
           </div>
         )}
@@ -309,6 +320,11 @@ export default function Metrics() {
         <p className="text-light-text/60">No metric types. Add one to get started!</p>
       ) : (
         <>
+          {selectedType.tags && selectedType.tags.length > 0 && (
+            <div className="mb-3">
+              <TagList tags={selectedType.tags} baseUrl="/metrics" />
+            </div>
+          )}
           {/* Trend chart */}
           {trend && trend.data.length > 0 && (
             <>

@@ -26,9 +26,12 @@ def list_goals(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     status: str | None = None,
+    tag: str | None = None,
     db: Session = Depends(get_db),
 ):
-    items, total = goal_service.list_goals(db, page=page, per_page=per_page, goal_status=status)
+    items, total = goal_service.list_goals(
+        db, page=page, per_page=per_page, goal_status=status, tag=tag
+    )
     return GoalListResponse(items=items, total=total, page=page, per_page=per_page)
 
 

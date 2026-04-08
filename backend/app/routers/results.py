@@ -28,8 +28,8 @@ router = APIRouter(prefix="/api", tags=["results"])
 
 
 @router.get("/exercise-types", response_model=list[ExerciseTypeResponse])
-def list_exercise_types(db: Session = Depends(get_db)):
-    return result_service.list_exercise_types(db)
+def list_exercise_types(tag: str | None = None, db: Session = Depends(get_db)):
+    return result_service.list_exercise_types(db, tag=tag)
 
 
 @router.post("/exercise-types", response_model=ExerciseTypeResponse, status_code=201)

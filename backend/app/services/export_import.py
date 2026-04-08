@@ -11,6 +11,7 @@ from app.models.goal import Goal
 from app.models.journal import JournalEntry
 from app.models.metric import MetricEntry, MetricType
 from app.models.result import ExerciseType, ResultEntry
+from app.models.tag import EntityTag
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -68,6 +69,7 @@ _GOAL_COLS = [
     "created_at",
     "updated_at",
 ]
+_ENTITY_TAG_COLS = ["id", "entity_type", "entity_id", "tag", "created_at"]
 
 _ENTITY_MAP: dict[str, tuple[type, list[str]]] = {
     "metric_types": (MetricType, _METRIC_TYPE_COLS),
@@ -76,6 +78,7 @@ _ENTITY_MAP: dict[str, tuple[type, list[str]]] = {
     "result_entries": (ResultEntry, _RESULT_ENTRY_COLS),
     "journal_entries": (JournalEntry, _JOURNAL_ENTRY_COLS),
     "goals": (Goal, _GOAL_COLS),
+    "entity_tags": (EntityTag, _ENTITY_TAG_COLS),
 }
 
 VALID_ENTITIES = frozenset(_ENTITY_MAP.keys())
@@ -182,7 +185,7 @@ def import_json(db: Session, data: dict[str, Any]) -> dict[str, int]:
     imported: dict[str, int] = {}
     skipped = 0
 
-    # Import order matters — types before entries, entries before goals
+    # Import order matters — types before entries, entries before goals, tags last
     ordered_entities = [
         "metric_types",
         "exercise_types",
@@ -190,6 +193,7 @@ def import_json(db: Session, data: dict[str, Any]) -> dict[str, int]:
         "result_entries",
         "journal_entries",
         "goals",
+        "entity_tags",
     ]
 
     for entity_name in ordered_entities:

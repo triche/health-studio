@@ -5,11 +5,13 @@ export function listGoals(params?: {
   page?: number;
   per_page?: number;
   status?: string;
+  tag?: string;
 }): Promise<GoalListResponse> {
   const search = new URLSearchParams();
   if (params?.page) search.set("page", String(params.page));
   if (params?.per_page) search.set("per_page", String(params.per_page));
   if (params?.status) search.set("status", params.status);
+  if (params?.tag) search.set("tag", params.tag);
   const qs = search.toString();
   return api.get<GoalListResponse>(`/api/goals${qs ? `?${qs}` : ""}`);
 }

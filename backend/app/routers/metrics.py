@@ -28,8 +28,8 @@ router = APIRouter(prefix="/api", tags=["metrics"])
 
 
 @router.get("/metric-types", response_model=list[MetricTypeResponse])
-def list_metric_types(db: Session = Depends(get_db)):
-    return metric_service.list_metric_types(db)
+def list_metric_types(tag: str | None = None, db: Session = Depends(get_db)):
+    return metric_service.list_metric_types(db, tag=tag)
 
 
 @router.post("/metric-types", response_model=MetricTypeResponse, status_code=201)

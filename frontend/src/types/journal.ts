@@ -3,6 +3,7 @@ export interface JournalEntry {
   title: string;
   content: string;
   entry_date: string;
+  tags: string[];
   created_at: string;
   updated_at: string;
 }
@@ -18,10 +19,12 @@ export interface JournalCreate {
   title: string;
   content: string;
   entry_date: string;
+  tags?: string[];
 }
 
 export interface JournalUpdate {
   title?: string;
   content?: string;
   entry_date?: string;
+  tags?: string[];
 }

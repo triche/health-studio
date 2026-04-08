@@ -28,12 +28,15 @@ def _handle_error(e: Exception) -> None:
 @app.command("list")
 def list_goals(
     status: str | None = typer.Option(None, help="Filter by status: active, completed, abandoned"),
+    tag: str | None = typer.Option(None, help="Filter by tag"),
 ) -> None:
     """List goals."""
     with get_client() as client:
         params: dict = {}
         if status:
             params["status"] = status
+        if tag:
+            params["tag"] = tag
 
         try:
             response = client.get("/api/goals", params=params)
@@ -95,6 +98,10 @@ def show(goal_id: str = typer.Argument(..., help="Goal ID")) -> None:
 
         if goal.get("deadline"):
             console.print(f"  Deadline: {goal['deadline']}")
+
+        tags = goal.get("tags", [])
+        if tags:
+            console.print(f"  Tags: {', '.join(tags)}")
 
         if goal.get("description"):
             console.print(f"\n{goal['description']}")

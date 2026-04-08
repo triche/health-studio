@@ -18,6 +18,7 @@ class GoalCreate(BaseModel):
     lower_is_better: bool = False
     status: str = "active"
     deadline: date | None = None
+    tags: list[str] | None = None
 
 
 class GoalUpdate(BaseModel):
@@ -31,6 +32,7 @@ class GoalUpdate(BaseModel):
     lower_is_better: bool | None = None
     status: str | None = None
     deadline: date | None = None
+    tags: list[str] | None = None
 
 
 class GoalResponse(BaseModel):
@@ -47,6 +49,7 @@ class GoalResponse(BaseModel):
     status: str
     deadline: date | None
     progress: float
+    tags: list[str] = []
     created_at: datetime
     updated_at: datetime
 

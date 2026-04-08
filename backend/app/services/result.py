@@ -7,6 +7,7 @@ from sqlalchemy import func
 
 from app.models.result import ExerciseType, ResultEntry
 from app.services.search import index_entity, remove_from_index
+from app.services.tags import delete_entity_tags, get_tags, sync_tags
 
 if TYPE_CHECKING:
     from datetime import date
@@ -26,6 +27,12 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
+def _attach_tags(db: Session, et: ExerciseType) -> ExerciseType:
+    """Attach tags list to exercise type for serialization."""
+    et.tags = get_tags(db, "exercise_type", et.id)  # type: ignore[attr-defined]
+    return et
+
+
 def create_exercise_type(db: Session, data: ExerciseTypeCreate) -> ExerciseType:
     existing = (
         db.query(ExerciseType).filter(func.lower(ExerciseType.name) == data.name.lower()).first()
@@ -38,29 +45,48 @@ def create_exercise_type(db: Session, data: ExerciseTypeCreate) -> ExerciseType:
     et = ExerciseType(name=data.name, category=data.category, result_unit=data.result_unit)
     db.add(et)
     db.flush()
-    extra = " ".join(filter(None, [data.category, data.result_unit]))
-    index_entity(db, "exercise_type", et.id, data.name, "", extra)
+    if data.tags is not None:
+        sync_tags(db, "exercise_type", et.id, data.tags)
+    extra_parts = list(filter(None, [data.category, data.result_unit]))
+    if data.tags:
+        extra_parts.extend(data.tags)
+    index_entity(db, "exercise_type", et.id, data.name, "", " ".join(extra_parts))
     db.commit()
     db.refresh(et)
-    return et
+    return _attach_tags(db, et)
 
 
 def get_exercise_type(db: Session, exercise_type_id: str) -> ExerciseType:
     et = db.get(ExerciseType, exercise_type_id)
     if et is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercise type not found")
-    return et
+    return _attach_tags(db, et)
 
 
-def list_exercise_types(db: Session) -> list[ExerciseType]:
-    return db.query(ExerciseType).order_by(ExerciseType.name).all()
+def list_exercise_types(db: Session, *, tag: str | None = None) -> list[ExerciseType]:
+    from app.models.tag import EntityTag
+
+    query = db.query(ExerciseType)
+    if tag is not None:
+        query = query.filter(
+            ExerciseType.id.in_(
+                db.query(EntityTag.entity_id).filter(
+                    EntityTag.entity_type == "exercise_type",
+                    EntityTag.tag == tag.strip().lower(),
+                )
+            )
+        )
+    return [_attach_tags(db, et) for et in query.order_by(ExerciseType.name).all()]
 
 
 def update_exercise_type(
     db: Session, exercise_type_id: str, data: ExerciseTypeUpdate
 ) -> ExerciseType:
-    et = get_exercise_type(db, exercise_type_id)
+    et = db.get(ExerciseType, exercise_type_id)
+    if et is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercise type not found")
     update_data = data.model_dump(exclude_unset=True)
+    tags = update_data.pop("tags", None)
     if "name" in update_data:
         existing = (
             db.query(ExerciseType)
@@ -75,16 +101,23 @@ def update_exercise_type(
             )
     for key, value in update_data.items():
         setattr(et, key, value)
-    extra = " ".join(filter(None, [et.category, et.result_unit]))
-    index_entity(db, "exercise_type", et.id, et.name, "", extra)
+    if tags is not None:
+        sync_tags(db, "exercise_type", et.id, tags)
+    tag_list = get_tags(db, "exercise_type", et.id)
+    extra_parts = list(filter(None, [et.category, et.result_unit]))
+    extra_parts.extend(tag_list)
+    index_entity(db, "exercise_type", et.id, et.name, "", " ".join(extra_parts))
     db.commit()
     db.refresh(et)
-    return et
+    return _attach_tags(db, et)
 
 
 def delete_exercise_type(db: Session, exercise_type_id: str) -> None:
-    et = get_exercise_type(db, exercise_type_id)
+    et = db.get(ExerciseType, exercise_type_id)
+    if et is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Exercise type not found")
     remove_from_index(db, "exercise_type", et.id)
+    delete_entity_tags(db, "exercise_type", et.id)
     db.delete(et)
     db.commit()
 
