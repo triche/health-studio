@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
-import click
+from typing import TYPE_CHECKING
+
 import typer
 import typer.core
+
+if TYPE_CHECKING:
+    import click
 
 from health_studio_cli.commands.config_cmd import app as config_app
 from health_studio_cli.commands.dashboard import app as dashboard_app

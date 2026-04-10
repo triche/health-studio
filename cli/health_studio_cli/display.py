@@ -9,9 +9,9 @@ from rich.table import Table
 console = Console()
 
 BANNER = (
-    "[dim white]  ╔════╗ [/]   [bold cyan]╦ ╦╔═╗╔═╗╦ ╔╦╗╦ ╦[/]  [bold green]╔═╗╔╦╗╦ ╦╔╦╗╦╔═╗[/]   [dim white]╔════╗[/]\n"
-    "[dim white]  ║    ║ [/]   [bold cyan]╠═╣║╣ ╠═╣║  ║ ╠═╣[/]  [bold green]╚═╗ ║ ║ ║ ║║║║ ║[/]   [dim white]║    ║[/]\n"
-    "[dim white]  ██████ [/]   [bold cyan]╩ ╩╚═╝╩ ╩╩═╝╩ ╩ ╩[/]  [bold green]╚═╝ ╩ ╚═╝═╩╝╩╚═╝[/]   [dim white]██████[/]\n"
+    "[dim white]  ╔════╗ [/]   [bold cyan]╦ ╦╔═╗╔═╗╦ ╔╦╗╦ ╦[/]  [bold green]╔═╗╔╦╗╦ ╦╔╦╗╦╔═╗[/]   [dim white]╔════╗[/]\n"  # noqa: E501
+    "[dim white]  ║    ║ [/]   [bold cyan]╠═╣║╣ ╠═╣║  ║ ╠═╣[/]  [bold green]╚═╗ ║ ║ ║ ║║║║ ║[/]   [dim white]║    ║[/]\n"  # noqa: E501
+    "[dim white]  ██████ [/]   [bold cyan]╩ ╩╚═╝╩ ╩╩═╝╩ ╩ ╩[/]  [bold green]╚═╝ ╩ ╚═╝═╩╝╩╚═╝[/]   [dim white]██████[/]\n"  # noqa: E501
     "[dim white]  ██████ [/]                                         [dim white]██████[/]\n"
     "[dim white]   ████  [/]                                          [dim white]████[/]"
 )
