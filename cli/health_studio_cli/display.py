@@ -8,15 +8,18 @@ from rich.table import Table
 
 console = Console()
 
-BANNER = """\
-╦ ╦╔═╗╔═╗╦ ╔╦╗╦ ╦  ╔═╗╔╦╗╦ ╦╔╦╗╦╔═╗
-╠═╣║╣ ╠═╣║  ║ ╠═╣  ╚═╗ ║ ║ ║ ║║║║ ║
-╩ ╩╚═╝╩ ╩╩═╝╩ ╩ ╩  ╚═╝ ╩ ╚═╝═╩╝╩╚═╝"""
+BANNER = (
+    "[dim white]  ╔════╗ [/]   [bold cyan]╦ ╦╔═╗╔═╗╦ ╔╦╗╦ ╦[/]  [bold green]╔═╗╔╦╗╦ ╦╔╦╗╦╔═╗[/]   [dim white]╔════╗[/]\n"
+    "[dim white]  ║    ║ [/]   [bold cyan]╠═╣║╣ ╠═╣║  ║ ╠═╣[/]  [bold green]╚═╗ ║ ║ ║ ║║║║ ║[/]   [dim white]║    ║[/]\n"
+    "[dim white]  ██████ [/]   [bold cyan]╩ ╩╚═╝╩ ╩╩═╝╩ ╩ ╩[/]  [bold green]╚═╝ ╩ ╚═╝═╩╝╩╚═╝[/]   [dim white]██████[/]\n"
+    "[dim white]  ██████ [/]                                         [dim white]██████[/]\n"
+    "[dim white]   ████  [/]                                          [dim white]████[/]"
+)
 
 
 def print_banner() -> None:
     """Print the ASCII art banner."""
-    console.print(BANNER, style="bold cyan")
+    console.print(BANNER)
 
 
 def print_table(title: str, columns: list[str], rows: list[list[str]]) -> None:

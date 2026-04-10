@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import click
 import typer
+import typer.core
 
 from health_studio_cli.commands.config_cmd import app as config_app
 from health_studio_cli.commands.dashboard import app as dashboard_app
@@ -19,8 +21,16 @@ from health_studio_cli.display import BANNER, console
 
 __version__ = "0.1.0"
 
+
+class BannerGroup(typer.core.TyperGroup):  # type: ignore[misc]
+    def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        console.print(BANNER)
+        super().format_help(ctx, formatter)
+
+
 app = typer.Typer(
     name="hs",
+    cls=BannerGroup,
     help="Health Studio CLI — command-line interface for the Health Studio API.",
     invoke_without_command=True,
     no_args_is_help=False,
@@ -54,6 +64,6 @@ def main(
 ) -> None:
     """Health Studio CLI."""
     if ctx.invoked_subcommand is None:
-        console.print(BANNER, style="bold cyan")
+        console.print(BANNER)
         console.print(f"\nHealth Studio CLI v{__version__}")
         console.print("Run [bold]hs --help[/bold] for usage information.\n")
