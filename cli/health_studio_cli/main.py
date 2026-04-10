@@ -14,6 +14,7 @@ from health_studio_cli.commands.metrics import app as metrics_app
 from health_studio_cli.commands.results import app as results_app
 from health_studio_cli.commands.search import app as search_app
 from health_studio_cli.commands.tags import app as tags_app
+from health_studio_cli.commands.timeline import app as timeline_app
 from health_studio_cli.display import BANNER, console
 
 __version__ = "0.1.0"
@@ -35,6 +36,7 @@ app.add_typer(export_app, name="export")
 app.add_typer(import_app, name="import")
 app.add_typer(search_app, name="search")
 app.add_typer(tags_app, name="tags")
+app.add_typer(timeline_app, name="timeline")
 
 
 def _version_callback(value: bool) -> None:

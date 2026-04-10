@@ -9,6 +9,7 @@ import JournalEdit from "./pages/JournalEdit";
 import Metrics from "./pages/Metrics";
 import Results from "./pages/Results";
 import Goals from "./pages/Goals";
+import Timeline from "./pages/Timeline";
 import Tags from "./pages/Tags";
 import Settings from "./pages/Settings";
 import Register from "./pages/Register";
@@ -100,6 +101,7 @@ function App() {
               <Route path="/metrics" element={<Metrics />} />
               <Route path="/results" element={<Results />} />
               <Route path="/goals" element={<Goals />} />
+              <Route path="/timeline" element={<Timeline />} />
               <Route path="/tags" element={<Tags />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
