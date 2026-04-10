@@ -14,8 +14,8 @@ This plan builds toward that vision in six phases, each delivering standalone va
 - [Data Model Additions](#data-model-additions)
 - [Phase 1 — Entity Mentions & Backlinks ✅](#phase-1--entity-mentions--backlinks-)
 - [Phase 2 — Global Search ✅](#phase-2--global-search-)
-- [Phase 3 — Tags](#phase-3--tags)
-- [Phase 4 — Unified Timeline](#phase-4--unified-timeline)
+- [Phase 3 — Tags ✅](#phase-3--tags-)
+- [Phase 4 — Unified Timeline ✅](#phase-4--unified-timeline-)
 - [Phase 5 — Smart Suggestions & Contextual Previews](#phase-5--smart-suggestions--contextual-previews)
 - [Phase 6 — Graph Visualization](#phase-6--graph-visualization)
 - [Appendix A — Local Embedding Model Evaluation](#appendix-a--local-embedding-model-evaluation)
@@ -412,192 +412,214 @@ New command: `hs search <query> [--type/-t journal|goal|metric|exercise] [--limi
 
 ---
 
-## Phase 3 — Tags
+## Phase 3 — Tags ✅
+
+**Status:** Implemented (branch `main`)
 
 **Goal:** Tag any entity (journals, goals, metric types, exercise types) with freeform labels. Filter any list by tag. Tags become lightweight connective tissue — group related things across entity types without explicit mention links.
 
-**Scope:** Tags model + migration, tag CRUD API, tag filtering on all list endpoints, tag UI on all entity pages, tag filter in sidebar/search.
+**Scope:** Tags model + migration, tag CRUD API, tag filtering on all list endpoints, tag UI on all entity pages, Tags browse page, CLI tag commands.
 
 ---
 
-### Backend
+### Backend (Implemented)
 
 **Model: `entity_tags`**
-- New file: `backend/app/models/tag.py`
-- Fields: `id`, `entity_type`, `entity_id`, `tag` (lowercase, trimmed), `created_at`
-- Unique constraint on `(entity_type, entity_id, tag)`
-- Register in `models/__init__.py`
+- `backend/app/models/tag.py`
+- Fields: `id` (UUID), `entity_type`, `entity_id`, `tag` (lowercase, trimmed), `created_at`
+- UniqueConstraint on `(entity_type, entity_id, tag)` named `uq_entity_tag`
+- Indexes: `ix_entity_tags_tag` on `tag`, `ix_entity_tags_entity` on `(entity_type, entity_id)`
+- Registered in `models/__init__.py`
 
 **Alembic migration:**
-- `alembic revision --autogenerate -m "add entity_tags table"`
+- `backend/alembic/versions/5fb932efb44c_add_entity_tags_table.py`
+- Creates `entity_tags` table with both indexes
 
 **Tag service: `backend/app/services/tags.py`**
 
-```python
-def add_tag(db, entity_type: str, entity_id: str, tag: str) -> EntityTag:
-    """Add a tag to an entity. Normalizes to lowercase/trimmed. No-op if already exists."""
-    ...
-
-def remove_tag(db, entity_type: str, entity_id: str, tag: str) -> None:
-    """Remove a tag from an entity."""
-    ...
-
-def get_tags(db, entity_type: str, entity_id: str) -> list[str]:
-    """Get all tags for an entity."""
-    ...
-
-def list_all_tags(db) -> list[dict]:
-    """Get all unique tags with usage counts, sorted by count desc."""
-    # Returns: [{"tag": "strength", "count": 12}, ...]
-    ...
-
-def get_entities_by_tag(db, tag: str, entity_type: str | None = None) -> list[dict]:
-    """Get all entities with a given tag, optionally filtered by type."""
-    ...
-
-def sync_tags(db, entity_type: str, entity_id: str, tags: list[str]) -> None:
-    """Set the exact tag list for an entity — adds new, removes missing."""
-    ...
-```
+- `add_tag(db, entity_type, entity_id, tag)` — Normalizes to lowercase/trimmed. No-op if already exists.
+- `remove_tag(db, entity_type, entity_id, tag)` — Removes a tag from an entity.
+- `get_tags(db, entity_type, entity_id)` — Returns all tags for an entity, sorted alphabetically.
+- `list_all_tags(db)` — All unique tags with usage counts, sorted by count desc then tag name.
+- `get_entities_by_tag(db, tag, entity_type=None)` — All entities with a given tag. Resolves entity titles via `_ENTITY_MODELS` lookup dict mapping entity_type → (Model, title_column).
+- `sync_tags(db, entity_type, entity_id, tags)` — Sets the exact tag list. Adds new tags, removes absent ones.
+- `delete_entity_tags(db, entity_type, entity_id)` — Bulk-delete all tags for an entity (used on entity deletion).
 
 **Schema changes:**
 
-Add optional `tags` field to existing create/update/response schemas:
-- `JournalCreate` / `JournalUpdate` / `JournalResponse` → `tags: list[str] | None`
-- `GoalCreate` / `GoalUpdate` / `GoalResponse` → `tags: list[str] | None`
-- `MetricTypeCreate` / `MetricTypeUpdate` / `MetricTypeResponse` → `tags: list[str] | None`
-- `ExerciseTypeCreate` / `ExerciseTypeUpdate` / `ExerciseTypeResponse` → `tags: list[str] | None`
+Added `tags` field to existing create/update/response schemas:
+- `JournalCreate` / `JournalUpdate` → `tags: list[str] | None = None`
+- `JournalResponse` → `tags: list[str] = []`
+- `GoalCreate` / `GoalUpdate` → `tags: list[str] | None = None`
+- `GoalResponse` → `tags: list[str] = []`
+- `MetricTypeCreate` / `MetricTypeUpdate` → `tags: list[str] | None = None`
+- `MetricTypeResponse` → `tags: list[str] = []`
+- `ExerciseTypeCreate` / `ExerciseTypeUpdate` → `tags: list[str] | None = None`
+- `ExerciseTypeResponse` → `tags: list[str] = []`
+
+New schemas in `backend/app/schemas/tag.py`:
+- `TagCount`: tag, count
+- `TagEntity`: entity_type, entity_id, title
+- `TagEntitiesResponse`: tag, entities (list[TagEntity])
 
 **Service layer changes:**
-- On create/update of any entity, if `tags` is provided, call `sync_tags()`
-- On get/list of any entity, include tags in the response (join or subquery)
-- On delete of any entity, cascade deletes entity_tags
+
+All four entity services (`journal.py`, `goal.py`, `metric.py`, `result.py`) updated:
+- On create/update: if `tags` is provided in the request data, call `sync_tags()`. Tags are popped from update data before the `setattr` loop to avoid SQLAlchemy column errors.
+- On get/list: tags are attached to entity objects via `_attach_tags()` helper functions that query `EntityTag` and set a `tags` attribute on the ORM object.
+- On delete: `delete_entity_tags()` called before entity deletion.
+- Tags included in FTS5 search index `extra` field (comma-separated) so tags are searchable via global search.
 
 **List endpoint filtering:**
-- Add `?tag=strength` query parameter to all list endpoints: `/api/journals`, `/api/goals`, `/api/metric-types`, `/api/exercise-types`
-- Filter via subquery: entities that have a matching row in `entity_tags`
+- `?tag=strength` query parameter added to: `/api/journals`, `/api/goals`, `/api/metric-types`, `/api/exercise-types`
+- Filtered via subquery: `entity_id IN (SELECT entity_id FROM entity_tags WHERE tag = ? AND entity_type = ?)`
 
-**New endpoints:**
+**New endpoints (in `backend/app/routers/tags.py`):**
 
-`GET /api/tags` → all unique tags with counts
-```json
-[
-  {"tag": "strength", "count": 12},
-  {"tag": "recovery", "count": 8},
-  {"tag": "nutrition", "count": 5}
-]
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/tags` | All unique tags with counts |
+| GET | `/api/tags/{tag}?type=` | All entities with a tag, optional type filter |
 
-`GET /api/tags/{tag}` → all entities with this tag
-```json
-{
-  "tag": "strength",
-  "entities": [
-    {"entity_type": "goal", "entity_id": "abc", "title": "Squat 405"},
-    {"entity_type": "journal", "entity_id": "def", "title": "Leg day reflections"},
-    {"entity_type": "exercise_type", "entity_id": "ghi", "title": "Back Squat"}
-  ]
-}
-```
-
-**Router:** New file `backend/app/routers/tags.py`, mounted under `/api`.
-
-**Search index impact:**
-- When tags change, re-index the entity with tags as part of the `extra` field so tags are searchable via global search.
+Response format matches the plan exactly.
 
 **Export/Import impact:**
-- `export_json` includes `entity_tags` in the payload
-- `import_json` imports `entity_tags` rows
-- Alternatively, embed tags in each entity's export object and derive entity_tags on import (cleaner JSON structure)
+- `export_json` includes `entity_tags` as a top-level key in the payload (raw rows with `_ENTITY_TAG_COLS`)
+- `import_json` imports `entity_tags` rows directly, added to `_ENTITY_MAP` and `ordered_entities` in `services/export_import.py`
 
 ---
 
-### Frontend
+### Frontend (Implemented)
 
-**Tag input component: `TagInput.tsx`**
+**Tag input component: `frontend/src/components/TagInput.tsx`**
 - Appears on journal edit, goal create/edit, metric type create, exercise type create
-- Displays current tags as removable pills/chips
-- Text input with autocomplete from existing tags (`GET /api/tags`)
-- Pressing Enter or comma adds the typed tag
+- Displays current tags as removable pills with × buttons
+- Text input with autocomplete from existing tags (fetches `GET /api/tags` on mount, filters client-side)
+- Pressing Enter adds the typed tag; typing a comma adds the preceding text as a tag
 - Clicking × on a pill removes it
-- Tags are normalized to lowercase on input
+- Tags normalized to lowercase on input; duplicates prevented
+- Autocomplete dropdown shows matching tags with usage counts
+- Click-outside closes suggestions
 
-**Tag display component: `TagList.tsx`**
-- Renders tags as clickable pills on list views and detail views
-- Clicking a tag navigates to a filtered view (e.g., `/journals?tag=strength`)
+**Tag display component: `frontend/src/components/TagList.tsx`**
+- Renders tags as clickable pill links (React Router `<Link>` elements)
+- Default links to `/tags?tag=...`; accepts `baseUrl` prop for entity-specific filtering (e.g., `/journals?tag=strength`)
+- Returns null when tags array is empty
 
-**Tag filter in list pages:**
-- Add a tag filter dropdown/pill bar above the list on Journals, Goals, Metrics, Results pages
-- Selecting a tag filters the list via `?tag=...` query parameter
-- Active tag filter shown as a dismissible pill
-- Can also be activated by clicking a tag on any entity
+**Tag integration in entity pages:**
+- `JournalEdit.tsx`: TagInput in the form; tags sent on create/update; loaded from existing entry on edit
+- `JournalList.tsx`: TagList on each entry card; tag filter from URL `?tag=` param; dismissible filter indicator bar
+- `Goals.tsx`: TagInput in create/edit form; tags in create/update API calls; TagList on each goal card
+- `Metrics.tsx`: TagInput in create metric type form; TagList below selected metric type header
+- `Results.tsx`: TagInput in create exercise type form; TagList below selected exercise type header
 
-**Tags page (optional but recommended):**
-- New page: `/tags` — browse all tags, see counts, click to see all entities with that tag
-- Or: integrate into the search palette as a "Browse by tag" section
+**Tags browse page: `frontend/src/pages/Tags.tsx`**
+- Route: `/tags`
+- Browse all tags as clickable pills with counts
+- Click a tag to see all entities grouped by type
+- Type filter buttons: Journal, Goal, Metric, Exercise
+- Back navigation to all tags view
+- Entity links navigate to the appropriate page
+
+**New type/API files:**
+- `frontend/src/types/tag.ts` — `TagCount`, `TagEntity`, `TagEntitiesResponse`
+- `frontend/src/api/tags.ts` — `listTags()`, `getEntitiesByTag(tag, type?)`
+- `?tag=` parameter added to `listGoals()`, `listJournals()`, `listMetricTypes()`, `listExerciseTypes()` in their respective API files
 
 **Sidebar addition:**
-- Add "Tags" navigation item below the existing items
+- "Tags" added to navigation links array in `Sidebar.tsx`
+
+**App routing:**
+- `Tags` page imported and `/tags` route added in `App.tsx`
 
 ---
 
-### CLI
+### CLI (Implemented)
 
-- `hs tags list` — all tags with counts
-- `hs tags show <tag>` — all entities with a tag
-- Support `--tag` filter on existing list commands: `hs journal list --tag recovery`
-- Support `--tags strength,recovery` on create/update commands
+**New commands (`cli/health_studio_cli/commands/tags.py`):**
+- `hs tags list` — all tags with counts, displayed as a Rich table
+- `hs tags show <tag> [--type/-t]` — all entities with a tag, optional type filter, color-coded by entity type (cyan=Journal, yellow=Goal, green=Metric, magenta=Exercise)
 
----
+**`--tag` filter on existing commands:**
+- `hs journal list --tag recovery`
+- `hs goals list --tag strength`
+- `hs metrics types --tag body`
+- `hs results types --tag olympic`
 
-### Tests
+**Tag display on show commands:**
+- `hs goals show` displays tags when present
 
-**Backend (pytest):**
-- `test_tags.py`:
-  - `test_add_tag` — tag is created and associated
-  - `test_add_tag_normalized` — "  Strength  " becomes "strength"
-  - `test_add_tag_idempotent` — adding same tag twice is a no-op
-  - `test_remove_tag` — tag is removed
-  - `test_get_tags` — returns all tags for an entity
-  - `test_sync_tags` — sets exact tag list, adding/removing as needed
-  - `test_list_all_tags` — returns unique tags with counts
-  - `test_get_entities_by_tag` — returns all entities with a tag
-  - `test_get_entities_by_tag_filtered` — type filter works
-  - `test_journal_create_with_tags` — journal creation includes tags
-  - `test_journal_update_tags` — updating journal tags syncs correctly
-  - `test_journal_list_filter_by_tag` — tag query parameter filters list
-  - `test_goal_list_filter_by_tag` — same for goals
-  - `test_tag_search_integration` — tags appear in search results
-  - `test_tag_cascade_delete` — deleting entity removes its tags
+> **Note:** `--tags` on create/update commands was not implemented — tags are managed through the frontend UI. This can be added later if needed.
 
-**Frontend (vitest):**
-- `Tags.test.tsx`:
-  - TagInput renders existing tags as pills
-  - TagInput adds tag on Enter
-  - TagInput removes tag on click
-  - TagInput autocompletes from existing tags
-  - TagList renders clickable tag pills
-  - Tag filter on journal list works
-  - Tags page shows all tags with counts
+**Registration:**
+- `tags_app` registered via `app.add_typer(tags_app, name="tags")` in `main.py`
 
 ---
 
-## Phase 4 — Unified Timeline
+### Tests (Implemented)
 
-**Goal:** A single chronological feed that interleaves all entity types — journal entries, metric entries, result entries, and goal milestones. This is the "home feed" of your health narrative. Replaces or supplements the existing dashboard with a richer, scrollable view of your health journey.
+**Backend — `backend/tests/test_tags.py` (38 tests across 14 classes):**
+- `TestAddTag` (3) — add tag, normalize whitespace/case, idempotent
+- `TestRemoveTag` (2) — remove tag, remove nonexistent is no-op
+- `TestGetTags` (1) — returns all tags for an entity
+- `TestSyncTags` (3) — adds new, removes missing, empty list clears all
+- `TestListAllTags` (1) — unique tags with counts, sorted by count desc
+- `TestGetEntitiesByTag` (3) — all entities, type filter, includes resolved title
+- `TestJournalTagsCRUD` (3) — create with tags, update tags, filter by tag
+- `TestGoalTagsCRUD` (2) — create with tags, filter by tag
+- `TestMetricTypeTagsCRUD` (2) — create with tags, filter by tag
+- `TestExerciseTypeTagsCRUD` (2) — create with tags, filter by tag
+- `TestTagsEndpoints` (3) — list all via API, entities by tag, type filter
+- `TestTagSearchIntegration` (1) — tags searchable via global search
+- `TestTagCascadeDelete` (2) — journal delete removes tags, goal delete removes tags
+- `TestTagExportImport` (2) — export includes entity_tags, import restores tags
 
-**Scope:** Timeline API endpoint, frontend timeline page, entity type filtering, infinite scroll, CLI timeline command.
+**Frontend — `frontend/tests/Tags.test.tsx` (10 tests):**
+- TagInput (7): renders pills, adds on Enter, adds on comma, removes on click, normalizes to lowercase, prevents duplicates, shows autocomplete suggestions
+- TagList (3): renders clickable pill links, links to correct filtered URL with baseUrl, renders empty when no tags
 
 ---
 
-### Backend
+### Export/Import Impact (Implemented)
 
-**New endpoint:**
+- Export includes `entity_tags` as a separate entity in the JSON payload (not embedded in each entity)
+- Import inserts `entity_tags` rows directly as part of the ordered entity import sequence
+- Tags are also re-indexed in the FTS5 search index as part of the entity's `extra` field
 
-`GET /api/timeline?page=1&per_page=20&types=journal,metric,result,goal&tag=strength&date_from=2026-01-01&date_to=2026-04-01`
+---
 
-This is a **union query** across multiple tables, ordered by date descending. Each item is normalized to a common shape:
+## Phase 4 — Unified Timeline ✅
 
+**Status:** Implemented (branch `main`)
+
+**Goal:** A single chronological feed that interleaves all entity types — journal entries, metric entries, result entries, and goal milestones. This is the "home feed" of your health narrative. Supplements the existing dashboard with a richer, scrollable view of your health journey.
+
+**Scope:** Timeline API endpoint, frontend timeline page, entity type filtering, "Load more" pagination, CLI timeline command.
+
+---
+
+### Backend (Implemented)
+
+**Timeline service: `backend/app/services/timeline.py`**
+
+- `get_timeline(db, *, page, per_page, types, tag, date_from, date_to)` — Returns a paginated, chronological timeline of health data.
+- Per-type query helpers (`_query_journals`, `_query_metrics`, `_query_results`, `_query_goals`) each project to a common `TimelineItem` dict shape with: `type`, `id`, `title`, `summary`, `date`, `tags`, `metadata`.
+- Implementation approach: query each included type separately, merge all items in Python, sort by date descending, slice to page. This is fast for realistic data sizes (thousands of entries).
+- Journal summaries: first 200 characters of content with "…" truncation.
+- Metric summaries: display value with unit (e.g., "205 lbs").
+- Result summaries: display_value or raw value; metadata includes `value`, `display_value`, `is_pr`, `is_rx`, `exercise_type_id`.
+- Goal summaries: status and computed progress percentage (e.g., "Active • 77% progress"); metadata includes `status`, `progress`, `event: "created"`. Progress is dynamically computed using `_compute_current_value` and `_compute_progress` from the goal service.
+- Tag filtering: applied per entity type via `EntityTag` subquery (journals filter on journal tags, metrics on metric_type tags, results on exercise_type tags, goals on goal tags).
+- Date filtering: journals use `entry_date`, metrics/results use `recorded_date`, goals use `created_at` (with `datetime.combine(date_to, time.max)` to include the full day).
+- `_truncate(text, max_len=200)` helper for content summaries.
+
+**Endpoint (in `backend/app/routers/timeline.py`):**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/timeline` | Unified timeline (`page`, `per_page`, `types`, `tag`, `date_from`, `date_to`) |
+
+Response format:
 ```json
 {
   "items": [
@@ -605,7 +627,7 @@ This is a **union query** across multiple tables, ordered by date descending. Ea
       "type": "journal",
       "id": "abc-123",
       "title": "Leg day reflections",
-      "summary": "First 200 chars of content...",
+      "summary": "First 200 chars of content…",
       "date": "2026-04-01",
       "tags": ["strength", "legs"],
       "metadata": {}
@@ -632,7 +654,7 @@ This is a **union query** across multiple tables, ordered by date descending. Ea
       "type": "goal",
       "id": "jkl-012",
       "title": "Squat 405",
-      "summary": "Created • 77% progress",
+      "summary": "Active • 77% progress",
       "date": "2026-03-15",
       "tags": ["strength"],
       "metadata": {"status": "active", "progress": 77.0, "event": "created"}
@@ -644,97 +666,94 @@ This is a **union query** across multiple tables, ordered by date descending. Ea
 }
 ```
 
-**Implementation approach:**
+**Schemas (`backend/app/schemas/timeline.py`):**
+- `TimelineItem`: type, id, title, summary, date, tags, metadata
+- `TimelineResponse`: items (list[TimelineItem]), total, page, per_page
 
-The timeline service builds a union query:
-
-```python
-def get_timeline(db, page, per_page, types, tag, date_from, date_to) -> dict:
-    """
-    Union across entity tables, each projecting the same columns.
-    Sort by date DESC, paginate.
-
-    For goals: include creation date. Goal status changes could be tracked
-    separately if we add an audit log in the future.
-    """
-    ...
-```
-
-Because SQLAlchemy union queries with different models can be awkward, a pragmatic approach:
-1. Query each included type separately with limit = per_page (fetch slightly more than needed)
-2. Merge and sort in Python
-3. Slice to page
-
-This is fast for realistic data sizes (thousands of entries, not millions). If performance becomes an issue, a materialized view or denormalized timeline table could be added later.
-
-**Service:** `backend/app/services/timeline.py`
-**Router:** `backend/app/routers/timeline.py`
-**Schemas:** `backend/app/schemas/timeline.py`
+**Router registered in `backend/app/main.py`:**
+- `app.include_router(timeline.router)`
 
 ---
 
-### Frontend
+### Frontend (Implemented)
 
-**New page: `/timeline`**
+**Timeline page: `frontend/src/pages/Timeline.tsx`**
 
-- Infinite scroll (or "Load more" button) rather than traditional pagination
-- Each timeline item is a card styled by entity type:
-  - **Journal:** Title, date, first 2 lines of content (rendered Markdown with mention pills via Phase 1's `renderMentions()`), tags, mention chips
-  - **Result:** Exercise name, value (with PR badge if applicable), date, notes excerpt, tags
-  - **Metric:** Metric name, value + unit, date, mini sparkline (last 7 values), tags
-  - **Goal:** Title, progress bar, status badge, date, tags
+- Route: `/timeline`
+- "Load more" button for pagination (appends items to existing list)
+- Each timeline item is a card styled by entity type with color-coded borders and icons:
+  - 📓 **Journal** (cyan): Title, date, content summary, tags
+  - 📊 **Metric** (green): Metric type name, value + unit, date, tags
+  - 🏋️ **Result** (purple): Exercise name, value, PR badge if applicable, date, tags
+  - 🎯 **Goal** (yellow): Title, progress bar with percentage, status, date, tags
 - Filter bar at the top:
-  - Entity type toggles (all on by default): Journal / Metric / Result / Goal
-  - Tag filter dropdown
-  - Date range picker
-- Clicking any card navigates to the entity's detail page
-- Cards show mention links and tags as clickable elements
+  - Entity type toggle buttons (all active by default) — click to toggle on/off
+  - Tag filter dropdown (populated from `GET /api/tags`)
+  - Date range inputs (from/to)
+- Clicking any card navigates to the entity's detail page:
+  - Journal → `/journals/{id}`
+  - Goal → `/goals`
+  - Metric → `/metrics`
+  - Result → `/results`
+- PR badge displayed as yellow "PR" pill on result cards with `is_pr: true`
+- Goal cards show animated progress bar with percentage
+- Tags displayed as styled pills on each card
+- Empty state: "No timeline entries yet" with helpful guidance
 
-**Sidebar addition:**
-- Add "Timeline" navigation item, positioned first (above Dashboard) or second
+**New type/API files:**
+- `frontend/src/types/timeline.ts` — `TimelineItem`, `TimelineResponse` interfaces
+- `frontend/src/api/timeline.ts` — `getTimeline(params?)` using URLSearchParams
 
-**Component: `TimelineCard.tsx`**
-- Polymorphic card component that renders different layouts based on `type`
-- Reuses existing styling patterns from Dashboard cards
+**Sidebar addition (`frontend/src/components/Sidebar.tsx`):**
+- "Timeline" added as second navigation link (after Dashboard, before Journal)
 
-**Component: `TimelineFilters.tsx`**
-- Entity type toggle buttons
-- Tag filter (reuses `TagInput.tsx` in filter mode)
-- Date range inputs
-
----
-
-### CLI
-
-New command: `hs timeline [--type journal,result] [--tag strength] [--limit 20]`
-
-- Renders a chronological list using Rich
-- Color-coded by entity type
-- Shows: date, type icon, title, summary
+**App routing (`frontend/src/App.tsx`):**
+- `Timeline` page imported and `/timeline` route added
 
 ---
 
-### Tests
+### CLI (Implemented)
 
-**Backend (pytest):**
-- `test_timeline.py`:
-  - `test_timeline_mixed_types` — returns interleaved journal + metric + result entries
-  - `test_timeline_type_filter` — `types=journal` excludes metrics and results
-  - `test_timeline_tag_filter` — only tagged entities appear
-  - `test_timeline_date_range` — date boundaries work
-  - `test_timeline_pagination` — page/per_page work correctly
-  - `test_timeline_ordering` — items ordered by date descending
-  - `test_timeline_empty` — no data returns empty list
-  - `test_timeline_goal_events` — goals appear with creation date
+**New command (`cli/health_studio_cli/commands/timeline.py`):**
+- `hs timeline [--type/-t journal,metric,result,goal] [--tag TAG] [--limit/-l 20]`
+- Renders a chronological list as a Rich table with columns: Date, Type, Title, Summary
+- Color-coded by entity type with emoji icons: 📓 Journal (cyan), 📊 Metric (green), 🏋️ Result (magenta), 🎯 Goal (yellow)
+- Summary truncated to 60 characters for terminal display
 
-**Frontend (vitest):**
-- `Timeline.test.tsx`:
-  - Renders mixed entity cards
-  - Type filter toggles work
-  - Tag filter works
-  - Cards navigate to correct detail pages
-  - Infinite scroll / load more works
-  - Empty state displayed when no data
+**Registration:**
+- `timeline_app` registered via `app.add_typer(timeline_app, name="timeline")` in `main.py`
+
+---
+
+### Tests (Implemented)
+
+**Backend — `backend/tests/test_timeline.py` (21 tests across 9 classes):**
+- `TestTimelineMixedTypes` (1) — returns interleaved journal + metric + result + goal entries
+- `TestTimelineTypeFilter` (2) — single type filter, multiple type filter
+- `TestTimelineTagFilter` (1) — only tagged entities appear
+- `TestTimelineDateRange` (3) — date_from, date_to, combined range
+- `TestTimelinePagination` (2) — page/per_page work, second page returns different items
+- `TestTimelineOrdering` (1) — items ordered by date descending
+- `TestTimelineEmpty` (1) — no data returns empty list
+- `TestTimelineGoalEvents` (1) — goals appear with creation date and metadata
+- `TestTimelineItemShape` (4) — journal/metric/result/goal items have expected fields and metadata
+- `TestTimelineEndpoint` (5) — returns results, type filter, pagination, empty timeline, requires auth
+
+**Frontend — `frontend/tests/Timeline.test.tsx` (8 tests):**
+- Renders mixed entity cards (journal, metric, result, goal)
+- Shows type filter toggles (Journal, Metric, Result, Goal buttons)
+- Type filter toggle triggers reload
+- Shows empty state when no data
+- Shows load more button when more items available
+- Displays PR badge on result cards
+- Displays progress info on goal cards
+- Cards navigate to correct detail pages
+
+---
+
+### Export/Import Impact
+
+- No export/import changes needed — the timeline is a read-only view that queries existing entities in real-time. No new tables or derived data to export.
 
 ---
 

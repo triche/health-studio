@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import typer
+import typer.core
+
+if TYPE_CHECKING:
+    import click
 
 from health_studio_cli.commands.config_cmd import app as config_app
 from health_studio_cli.commands.dashboard import app as dashboard_app
@@ -14,12 +20,21 @@ from health_studio_cli.commands.metrics import app as metrics_app
 from health_studio_cli.commands.results import app as results_app
 from health_studio_cli.commands.search import app as search_app
 from health_studio_cli.commands.tags import app as tags_app
+from health_studio_cli.commands.timeline import app as timeline_app
 from health_studio_cli.display import BANNER, console
 
 __version__ = "0.1.0"
 
+
+class BannerGroup(typer.core.TyperGroup):  # type: ignore[misc]
+    def format_help(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        console.print(BANNER)
+        super().format_help(ctx, formatter)
+
+
 app = typer.Typer(
     name="hs",
+    cls=BannerGroup,
     help="Health Studio CLI — command-line interface for the Health Studio API.",
     invoke_without_command=True,
     no_args_is_help=False,
@@ -35,6 +50,7 @@ app.add_typer(export_app, name="export")
 app.add_typer(import_app, name="import")
 app.add_typer(search_app, name="search")
 app.add_typer(tags_app, name="tags")
+app.add_typer(timeline_app, name="timeline")
 
 
 def _version_callback(value: bool) -> None:
@@ -52,6 +68,6 @@ def main(
 ) -> None:
     """Health Studio CLI."""
     if ctx.invoked_subcommand is None:
-        console.print(BANNER, style="bold cyan")
+        console.print(BANNER)
         console.print(f"\nHealth Studio CLI v{__version__}")
         console.print("Run [bold]hs --help[/bold] for usage information.\n")
