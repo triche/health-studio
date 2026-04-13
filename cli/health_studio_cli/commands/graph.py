@@ -57,7 +57,11 @@ def graph(ctx: typer.Context) -> None:
         orphan_count = sum(1 for n in nodes if connection_count[n["id"]] == 0)
 
         console.print("\n[bold]Graph Summary[/bold]")
-        console.print(f"  Nodes: [cyan]{len(nodes)}[/cyan]  Edges: [cyan]{len(edges)}[/cyan]  Orphans: [yellow]{orphan_count}[/yellow]")
+        console.print(
+            f"  Nodes: [cyan]{len(nodes)}[/cyan]"
+            f"  Edges: [cyan]{len(edges)}[/cyan]"
+            f"  Orphans: [yellow]{orphan_count}[/yellow]"
+        )
 
         # Node type breakdown
         type_rows = []
