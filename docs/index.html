@@ -69,6 +69,10 @@
       <li><strong>Dashboard</strong> — Aggregated overview of recent activity, active goals, latest metrics, and PRs</li>
       <li><strong>Digital Thread</strong> — Link journal entries to goals, metrics, and exercises with <code>[[type:name]]</code> mentions; autocomplete, styled pill links, and backlinks on entity pages</li>
       <li><strong>Global Search</strong> — Full-text search across all entity types via <code>Cmd+K</code> command palette; FTS5-powered with BM25 ranking, Porter stemming, prefix queries, and type filtering</li>
+      <li><strong>Tags</strong> — Organize entities with tags; browse by tag, filter timelines and lists, cross-entity tag pages</li>
+      <li><strong>Timeline</strong> — Unified chronological feed interleaving journal entries, metrics, results, and goals with type, tag, and date filtering</li>
+      <li><strong>Entity Previews</strong> — Hover over mention links to see contextual preview cards with sparklines, progress bars, and latest values</li>
+      <li><strong>Graph</strong> — Interactive force-directed graph visualization of entity connections (mentions, goal targets, shared tags) with type filters and click-to-navigate</li>
       <li><strong>Dark/Light mode</strong> — Toggle between themes; preference persisted</li>
       <li><strong>Responsive layout</strong> — Collapsible sidebar for mobile</li>
       <li><strong>CLI</strong> — Command-line interface for managing data from the terminal</li>
@@ -94,7 +98,7 @@
 │  port 3000     │      │  port 8000     │      │ data/    │
 └────────────────┘      └────────────────┘      └──────────┘</code></pre>
     <ul>
-      <li><strong>Frontend</strong>: React 19, TypeScript, Tailwind CSS, Plotly.js, react-markdown</li>
+      <li><strong>Frontend</strong>: React 19, TypeScript, Tailwind CSS, Plotly.js, react-markdown, react-force-graph-2d</li>
       <li><strong>Backend</strong>: FastAPI, SQLAlchemy, Alembic, py_webauthn</li>
       <li><strong>Database</strong>: SQLite — zero-config, file-based</li>
       <li><strong>Auth</strong>: WebAuthn/Passkeys (passwordless) + scoped API keys</li>
@@ -189,6 +193,31 @@
       <tr><td>GET</td><td><code>/api/search</code></td><td>Full-text search (<code>q</code>, <code>types</code>, <code>limit</code>, <code>offset</code>)</td></tr>
     </table>
 
+    <h3>Tags</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/tags</code></td><td>List all tags with usage counts</td></tr>
+      <tr><td>GET</td><td><code>/api/tags/{tag}</code></td><td>Get entities with a given tag</td></tr>
+    </table>
+
+    <h3>Timeline</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/timeline</code></td><td>Unified chronological feed (<code>page</code>, <code>per_page</code>, <code>types</code>, <code>tag</code>, <code>date_from</code>, <code>date_to</code>)</td></tr>
+    </table>
+
+    <h3>Entity Preview</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/entities/preview</code></td><td>Contextual preview for an entity (<code>type</code>, <code>id</code> params)</td></tr>
+    </table>
+
+    <h3>Graph</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td>GET</td><td><code>/api/graph</code></td><td>Entity relationship graph (<code>min_connections</code>, <code>include_orphans</code> params)</td></tr>
+    </table>
+
     <h3>Export / Import</h3>
     <table>
       <tr><th>Method</th><th>Path</th><th>Description</th></tr>
@@ -205,6 +234,6 @@
 hs config init
 hs config set url http://localhost:8000
 hs config set api-key &lt;your-key&gt;</code></pre>
-    <p>Available commands: <code>hs dashboard</code>, <code>hs journal</code>, <code>hs metrics</code>, <code>hs results</code>, <code>hs goals</code>, <code>hs search</code>, <code>hs export</code>, <code>hs import</code>, <code>hs config</code>.</p>
+    <p>Available commands: <code>hs dashboard</code>, <code>hs journal</code>, <code>hs metrics</code>, <code>hs results</code>, <code>hs goals</code>, <code>hs search</code>, <code>hs tags</code>, <code>hs timeline</code>, <code>hs graph</code>, <code>hs export</code>, <code>hs import</code>, <code>hs config</code>.</p>
   </body>
 </html>

@@ -5,6 +5,7 @@ import DarkModeToggle from "./DarkModeToggle";
 const links = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/timeline", label: "Timeline" },
+  { to: "/graph", label: "Graph" },
   { to: "/journals", label: "Journal" },
   { to: "/metrics", label: "Metrics" },
   { to: "/results", label: "Results" },
