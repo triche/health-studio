@@ -13,6 +13,7 @@ from app.routers import (
     entities,
     export_import,
     goals,
+    graph,
     journals,
     mentions,
     metrics,
@@ -38,6 +39,7 @@ app.include_router(search.router)
 app.include_router(tags.router)
 app.include_router(timeline.router)
 app.include_router(export_import.router)
+app.include_router(graph.router)
 
 # ---------------------------------------------------------------------------
 # CORS
