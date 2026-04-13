@@ -11,6 +11,10 @@ A local-first personal health dashboard, journal, and tracker. Consolidates ment
 - **Dashboard** — Aggregated overview of recent activity, active goals, latest metrics, and recent PRs
 - **Digital Thread** — Link journal entries to goals, metrics, and exercises with `[[type:name]]` mentions; autocomplete on `[[`, rendered as styled pills, with backlinks shown on entity pages
 - **Global Search** — Full-text search across all entity types via `Cmd+K` command palette; FTS5-powered with BM25 ranking, Porter stemming, prefix queries, and type filtering
+- **Tags** — Organize entities with tags; browse by tag, filter timelines/lists, cross-entity tag pages
+- **Timeline** — Unified chronological feed interleaving journal entries, metrics, results, and goals with type/tag/date filtering
+- **Entity Previews** — Hover over mention links to see contextual preview cards with sparklines, progress bars, and latest values
+- **Graph** — Interactive force-directed graph visualization of entity connections (mentions, goal targets, shared tags) with type filters and click-to-navigate
 - **Dark/Light mode** — Toggle between themes; preference persisted in localStorage
 - **Responsive layout** — Collapsible sidebar for mobile; full sidebar on desktop
 - **CLI** — Full-featured command-line interface (`hs`) for managing data from the terminal
@@ -40,7 +44,7 @@ Visit **http://localhost:3000** to register a passkey and start using the app.
 └────────────────┘      └────────────────┘      └──────────┘
 ```
 
-- **Frontend**: React 19, TypeScript, Tailwind CSS, Plotly.js, react-markdown
+- **Frontend**: React 19, TypeScript, Tailwind CSS, Plotly.js, react-markdown, react-force-graph-2d
 - **Backend**: FastAPI, SQLAlchemy, Alembic, py_webauthn
 - **Database**: SQLite — zero-config, file-based, stored in `backend/data/`
 - **Auth**: WebAuthn/Passkeys (passwordless) + scoped API keys for CLI/scripts
@@ -112,6 +116,11 @@ hs goals list               # List goals
 hs goals create             # Create a goal
 hs search <query>           # Search across all data
 hs search <query> -t goal   # Search filtered by type
+hs tags                     # List all tags with counts
+hs tags <tag>               # List entities with a tag
+hs timeline                 # Show unified timeline
+hs timeline -t journal      # Filter by type
+hs graph                    # Show graph connection stats
 ```
 
 ## API Reference
@@ -194,6 +203,27 @@ All endpoints are prefixed with `/api`. Authentication is required for all endpo
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/search` | Full-text search (`q`, `types`, `limit`, `offset` params) |
+
+### Tags
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/tags` | List all tags with usage counts |
+| GET | `/api/tags/{tag}` | Get entities with a given tag |
+
+### Timeline
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/timeline` | Unified chronological feed (`page`, `per_page`, `types`, `tag`, `date_from`, `date_to`) |
+
+### Entity Preview
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/entities/preview` | Contextual preview for an entity (`type`, `id` params) |
+
+### Graph
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/graph` | Entity relationship graph (`min_connections`, `include_orphans` params) |
 
 ### Export / Import
 | Method | Path | Description |
