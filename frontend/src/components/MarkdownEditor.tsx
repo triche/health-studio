@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import MDEditor, { commands } from "@uiw/react-md-editor";
 import MentionAutocomplete from "./MentionAutocomplete";
+import MentionSuggestions from "./MentionSuggestions";
 
 interface MarkdownEditorProps {
   value: string;
@@ -60,6 +61,20 @@ export default function MarkdownEditor({
     [onChange],
   );
 
+  const handleSuggestionInsert = useCallback(
+    (mention: string) => {
+      // Insert at cursor position if available, otherwise append
+      const textarea = containerRef.current?.querySelector("textarea");
+      const cursorPos = textarea?.selectionStart ?? value.length;
+      const before = value.slice(0, cursorPos);
+      const after = value.slice(cursorPos);
+      const spaceBefore = before.length > 0 && !before.endsWith(" ") ? " " : "";
+      const spaceAfter = after.length > 0 && !after.startsWith(" ") ? " " : "";
+      onChange(before + spaceBefore + mention + spaceAfter + after);
+    },
+    [onChange, value],
+  );
+
   return (
     <div data-color-mode={colorMode} ref={containerRef} className="relative">
       <MDEditor
@@ -72,6 +87,7 @@ export default function MarkdownEditor({
         data-testid={testId}
       />
       <MentionAutocomplete containerRef={containerRef} value={value} onInsert={handleInsert} />
+      <MentionSuggestions content={value} onInsert={handleSuggestionInsert} />
     </div>
   );
 }

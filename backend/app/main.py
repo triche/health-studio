@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from app.config import ALLOWED_ORIGINS, DEBUG, MAX_BODY_SIZE, TESTING
 from app.database import get_db
 from app.routers import (
+    entities,
     export_import,
     goals,
     journals,
@@ -32,6 +33,7 @@ app.include_router(metrics.router)
 app.include_router(results.router)
 app.include_router(goals.router)
 app.include_router(mentions.router)
+app.include_router(entities.router)
 app.include_router(search.router)
 app.include_router(tags.router)
 app.include_router(timeline.router)
