@@ -16,7 +16,7 @@ This plan builds toward that vision in six phases, each delivering standalone va
 - [Phase 2 — Global Search ✅](#phase-2--global-search-)
 - [Phase 3 — Tags ✅](#phase-3--tags-)
 - [Phase 4 — Unified Timeline ✅](#phase-4--unified-timeline-)
-- [Phase 5 — Smart Suggestions & Contextual Previews](#phase-5--smart-suggestions--contextual-previews)
+- [Phase 5 — Smart Suggestions & Contextual Previews ✅](#phase-5--smart-suggestions--contextual-previews-)
 - [Phase 6 — Graph Visualization](#phase-6--graph-visualization)
 - [Appendix A — Local Embedding Model Evaluation](#appendix-a--local-embedding-model-evaluation)
 - [Appendix B — Entity Reference Syntax](#appendix-b--entity-reference-syntax)
@@ -757,7 +757,9 @@ Response format:
 
 ---
 
-## Phase 5 — Smart Suggestions & Contextual Previews
+## Phase 5 — Smart Suggestions & Contextual Previews ✅
+
+**Status:** Implemented (branch `triche/dt-phase5`)
 
 **Goal:** Reduce friction in building connections. When writing a journal entry, Health Studio suggests entities to link based on what you're typing. When hovering over links and backlinks, see a preview card without navigating away.
 

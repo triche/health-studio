@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import EntityPreview from "./EntityPreview";
 
 const MENTION_REGEX =
   /\[\[(goal|goals|metric|metrics|metric_type|exercise|exercises|exercise_type|result|results):([^\]]+)\]\]/gi;
@@ -18,17 +19,22 @@ const ALIAS_MAP: Record<string, string> = {
   results: "exercise",
 };
 
-const TYPE_CONFIG: Record<string, { prefix: string; path: string; icon: string }> = {
-  goal: { prefix: "goal", path: "/goals", icon: "🎯" },
-  metric: { prefix: "metric", path: "/metrics", icon: "📊" },
-  exercise: { prefix: "exercise", path: "/results", icon: "🏋️" },
+const TYPE_CONFIG: Record<
+  string,
+  { prefix: string; path: string; icon: string; previewType: string }
+> = {
+  goal: { prefix: "goal", path: "/goals", icon: "🎯", previewType: "goal" },
+  metric: { prefix: "metric", path: "/metrics", icon: "📊", previewType: "metric_type" },
+  exercise: { prefix: "exercise", path: "/results", icon: "🏋️", previewType: "exercise_type" },
 };
 
 /**
  * Parse journal content and replace [[type:name]] with styled links.
+ * When entityIds is provided (mapping "type:name" → entity ID), mention links
+ * are wrapped in EntityPreview hover cards.
  * Returns an array of ReactNode elements.
  */
-export function renderMentions(content: string): ReactNode[] {
+export function renderMentions(content: string, entityIds?: Record<string, string>): ReactNode[] {
   const parts: ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -47,7 +53,7 @@ export function renderMentions(content: string): ReactNode[] {
     const config = type ? TYPE_CONFIG[type] : undefined;
 
     if (config) {
-      parts.push(
+      const link = (
         <Link
           key={`mention-${match.index}`}
           to={config.path}
@@ -55,8 +61,24 @@ export function renderMentions(content: string): ReactNode[] {
         >
           <span>{config.icon}</span>
           {name}
-        </Link>,
+        </Link>
       );
+
+      // Wrap in EntityPreview if we have an entity ID for this mention
+      const entityId = entityIds?.[`${config.previewType}:${name}`];
+      if (entityId) {
+        parts.push(
+          <EntityPreview
+            key={`preview-${match.index}`}
+            entityType={config.previewType}
+            entityId={entityId}
+          >
+            {link}
+          </EntityPreview>,
+        );
+      } else {
+        parts.push(link);
+      }
     } else {
       parts.push(match[0]);
     }
