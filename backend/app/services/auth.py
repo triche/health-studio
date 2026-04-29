@@ -12,6 +12,8 @@ from fastapi import HTTPException, status
 from webauthn import generate_authentication_options, generate_registration_options
 from webauthn import verify_authentication_response as _verify_auth
 from webauthn import verify_registration_response as _verify_reg
+from webauthn.helpers import base64url_to_bytes, parse_client_data_json
+from webauthn.helpers.exceptions import InvalidAuthenticationResponse
 from webauthn.helpers.structs import (
     AuthenticatorSelectionCriteria,
     PublicKeyCredentialDescriptor,
@@ -67,6 +69,30 @@ def _pop_challenge(db: Session, challenge: bytes) -> bytes | None:
     db.delete(entry)
     db.commit()
     return result
+
+
+def _purge_expired_challenges(db: Session) -> None:
+    """Delete challenge rows older than CHALLENGE_TTL."""
+    cutoff = time.time() - CHALLENGE_TTL
+    db.query(AuthChallenge).filter(AuthChallenge.created_at <= cutoff).delete()
+    db.commit()
+
+
+def _extract_credential_challenge(credential: dict) -> bytes | None:
+    """Decode the challenge that the authenticator actually signed.
+
+    The browser echoes the challenge back inside ``response.clientDataJSON``
+    (base64url-encoded JSON). Parsing it lets us look up the exact matching
+    server-side challenge instead of guessing among stored rows.
+    """
+    try:
+        client_data_b64 = credential["response"]["clientDataJSON"]
+        client_data_bytes = base64url_to_bytes(client_data_b64)
+        parsed = parse_client_data_json(client_data_bytes)
+    except Exception:
+        return None
+    challenge = getattr(parsed, "challenge", None)
+    return challenge if isinstance(challenge, (bytes, bytearray)) else None
 
 
 def clear_challenges(db: Session) -> None:
@@ -258,6 +284,8 @@ def begin_authentication(db: Session) -> dict:
             detail="No registered user found. Please register first.",
         )
 
+    _purge_expired_challenges(db)
+
     options = generate_authentication_options(
         rp_id=RP_ID,
         allow_credentials=[
@@ -281,14 +309,22 @@ def complete_authentication(db: Session, credential: dict) -> str:
             detail="No registered user found.",
         )
 
-    # Find a valid stored challenge
-    now = time.time()
-    cutoff = now - CHALLENGE_TTL
-    entry = db.query(AuthChallenge).filter(AuthChallenge.created_at > cutoff).first()
+    # Drop expired rows so they can't be picked accidentally.
+    _purge_expired_challenges(db)
 
-    challenge = None
-    if entry is not None:
-        challenge = bytes(entry.challenge)
+    # Prefer looking up the exact challenge the authenticator signed.
+    challenge: bytes | None = None
+    signed = _extract_credential_challenge(credential)
+    if signed is not None:
+        entry = db.query(AuthChallenge).filter(AuthChallenge.challenge_hex == signed.hex()).first()
+        if entry is not None:
+            challenge = bytes(entry.challenge)
+
+    # Fallback: most recently issued challenge (covers tests with mocked verify).
+    if challenge is None:
+        entry = db.query(AuthChallenge).order_by(AuthChallenge.created_at.desc()).first()
+        if entry is not None:
+            challenge = bytes(entry.challenge)
 
     if challenge is None:
         raise HTTPException(
@@ -296,10 +332,19 @@ def complete_authentication(db: Session, credential: dict) -> str:
             detail="No valid authentication challenge found. Please restart login.",
         )
 
-    verification = verify_authentication_response(credential, challenge, user)
+    try:
+        verification = verify_authentication_response(credential, challenge, user)
+    except InvalidAuthenticationResponse as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed. Please restart login.",
+        ) from exc
 
     # Pop the used challenge
     _pop_challenge(db, challenge)
+
+    # Single-user app: any other in-flight challenges are now abandoned.
+    clear_challenges(db)
 
     # Update sign count
     user.sign_count = verification.new_sign_count
