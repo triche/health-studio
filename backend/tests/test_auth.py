@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
+from webauthn.helpers.exceptions import InvalidAuthenticationResponse
 
 from app.models.auth_state import AuthChallenge, AuthRateLimit, AuthSession
 from app.models.user import User
@@ -126,6 +127,77 @@ class TestLogin:
         # After logout, protected endpoints return 401
         resp = client.get("/api/journals")
         assert resp.status_code == 401
+
+    def test_login_complete_invalid_challenge_returns_401(self, client):
+        _register_user(client)
+        resp = client.post("/api/auth/login")
+        assert resp.status_code == 200
+
+        with patch(
+            "app.services.auth.verify_authentication_response",
+            side_effect=InvalidAuthenticationResponse(
+                "Client data challenge was not expected challenge"
+            ),
+        ):
+            resp2 = client.post(
+                "/api/auth/login/complete",
+                json={
+                    "id": "AQIDBA",
+                    "rawId": "AQIDBA",
+                    "response": {
+                        "authenticatorData": "fake",
+                        "clientDataJSON": "fake",
+                        "signature": "fake",
+                    },
+                    "type": "public-key",
+                },
+            )
+
+        assert resp2.status_code == 401
+        assert "failed" in resp2.json()["detail"].lower()
+
+    def test_login_succeeds_with_stale_challenges_in_db(self, client, db):
+        """Stale challenges from previous login attempts must not break a new login."""
+        from app.models.auth_state import AuthChallenge
+        from app.services import auth as auth_service
+
+        _register_user(client)
+
+        # Simulate leftover challenges from prior login attempts (no longer relevant).
+        for i in range(5):
+            auth_service._store_challenge(db, bytes([i + 1]) * 16)
+
+        resp = _login_user(client)
+        assert resp.status_code == 200, resp.text
+
+        # Used challenge plus stale entries should be cleaned up by login flow.
+        remaining = db.query(AuthChallenge).count()
+        assert remaining <= 1, f"expected stale challenges cleaned up, found {remaining}"
+
+    def test_begin_login_clears_expired_challenges(self, client, db):
+        """begin_authentication should evict expired challenge rows."""
+        import time as _time
+
+        from app.config import CHALLENGE_TTL
+        from app.models.auth_state import AuthChallenge
+
+        _register_user(client)
+
+        # Insert an expired challenge directly.
+        expired = AuthChallenge(
+            challenge_hex="dead" * 8,
+            challenge=b"\xde\xad" * 16,
+            created_at=_time.time() - CHALLENGE_TTL - 60,
+            display_name=None,
+        )
+        db.add(expired)
+        db.commit()
+
+        resp = client.post("/api/auth/login")
+        assert resp.status_code == 200
+
+        rows = db.query(AuthChallenge).filter(AuthChallenge.challenge_hex == "dead" * 8).all()
+        assert rows == []
 
 
 # ---------------------------------------------------------------------------
